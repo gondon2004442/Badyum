@@ -6,6 +6,8 @@
   "engines": {
     "node": ">=22"
   },
+  "//": "Версия pnpm закреплена: без неё corepack в образах и CI тянет свежую, и сборка перестаёт быть воспроизводимой.",
+  "packageManager": "pnpm@10.33.0",
   "scripts": {
     "dev": "pnpm --parallel --filter \"./packages/*\" dev",
     "build": "pnpm --filter \"./packages/*\" build",

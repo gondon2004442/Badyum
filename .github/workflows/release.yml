@@ -1,0 +1,83 @@
+name: Release
+
+# Установщики собираются по тегу: git tag v0.1.0 && git push --tags
+on:
+  push:
+    tags:
+      - "v*"
+  # Прогнать сборку, не публикуя релиз, — чтобы проверить, что она вообще жива.
+  workflow_dispatch:
+
+jobs:
+  installers:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: windows-latest
+            name: Windows
+          - os: macos-latest
+            name: macOS
+          - os: ubuntu-latest
+            name: Linux
+
+    runs-on: ${{ matrix.os }}
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Системные зависимости Tauri
+        if: matrix.os == 'ubuntu-latest'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libwebkit2gtk-4.1-dev build-essential \
+            libxdo-dev libssl-dev libayatana-appindicator3-dev librsvg2-dev
+
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 10
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: apps/desktop/src-tauri
+
+      - run: pnpm install --frozen-lockfile
+
+      # Адрес сервера зашивается в сборку: страница в приложении грузится из
+      # локальных файлов, и относительный путь оттуда никуда не ведёт.
+      # Задаётся переменной репозитория BADYUM_SERVER_URL
+      # (Settings -> Secrets and variables -> Actions -> Variables).
+      - name: Адрес сервера
+        shell: bash
+        run: |
+          SERVER="${{ vars.BADYUM_SERVER_URL }}"
+          if [ -z "$SERVER" ]; then
+            echo "::error::Не задана переменная BADYUM_SERVER_URL — приложение собралось бы без адреса сервера и не смогло бы никуда подключиться."
+            exit 1
+          fi
+          echo "VITE_BADYUM_SERVER=$SERVER" > packages/client/.env.desktop
+          echo "Сервер: $SERVER"
+
+      - uses: tauri-apps/tauri-action@v0
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          projectPath: apps/desktop
+          tagName: ${{ github.ref_name }}
+          releaseName: Badyum ${{ github.ref_name }}
+          releaseBody: |
+            Скачай установщик для своей системы:
+
+            - **Windows** — файл `.msi`
+            - **macOS** — файл `.dmg`
+            - **Linux** — `.AppImage` или `.deb`
+
+            Приложение подключается к серверу, указанному при сборке.
+          releaseDraft: true
+          prerelease: false

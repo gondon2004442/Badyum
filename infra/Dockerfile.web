@@ -1,0 +1,27 @@
+# Статика клиента + HTTPS + проксирование к сигналингу.
+#
+# Микрофон браузер отдаёт только в защищённом контексте, так что HTTPS здесь не
+# украшение, а условие работы приложения. Caddy получает сертификат сам.
+
+FROM node:22-alpine AS build
+RUN corepack enable
+WORKDIR /app
+
+# tsconfig.base.json нужен именно здесь: сборка клиента прогоняет tsc, а без
+# базового конфига он молча берёт умолчания и валится десятком чужих ошибок.
+COPY package.json pnpm-lock.yaml pnpm-workspace.yaml tsconfig.base.json ./
+COPY packages/shared/package.json ./packages/shared/
+COPY packages/server/package.json ./packages/server/
+COPY packages/client/package.json ./packages/client/
+RUN pnpm install --frozen-lockfile --filter @badyum/client...
+
+COPY packages/shared ./packages/shared
+COPY packages/client ./packages/client
+
+# Обычная веб-сборка: страница и API живут на одном домене, поэтому адрес
+# сервера зашивать не нужно — работают относительные пути.
+RUN pnpm --filter @badyum/client build
+
+FROM caddy:2-alpine
+COPY infra/Caddyfile /etc/caddy/Caddyfile
+COPY --from=build /app/packages/client/dist /srv

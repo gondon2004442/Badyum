@@ -1,0 +1,70 @@
+# Боевое развёртывание: `docker compose -f infra/docker-compose.prod.yml up -d`
+#
+# Нужны только домен, направленный на этот сервер, и файл .env рядом с этим
+# файлом (см. infra/.env.example). Сертификат Caddy получит сам.
+
+name: badyum
+
+services:
+  web:
+    build:
+      context: ..
+      dockerfile: infra/Dockerfile.web
+    restart: unless-stopped
+    environment:
+      BADYUM_DOMAIN: ${BADYUM_DOMAIN:?укажи домен, например badyum.app}
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      # Сертификаты переживают пересборку — иначе на каждом деплое
+      # перевыпуск и быстрый упор в лимиты Let's Encrypt.
+      - caddy-data:/data
+      - caddy-config:/config
+    depends_on:
+      - server
+
+  server:
+    build:
+      context: ..
+      dockerfile: infra/Dockerfile.server
+    restart: unless-stopped
+    environment:
+      BADYUM_TOKEN_SECRET: ${BADYUM_TOKEN_SECRET:?сгенерируй, например openssl rand -hex 32}
+      # Наружу сервер не публикуется: браузер ходит к нему через Caddy на том
+      # же домене, поэтому источником всегда будет сам домен.
+      BADYUM_ORIGINS: https://${BADYUM_DOMAIN},tauri://localhost,http://tauri.localhost
+      BADYUM_TURN_HOSTS: ${BADYUM_TURN_HOSTS:-}
+      BADYUM_TURN_SECRET: ${BADYUM_TURN_SECRET:-}
+      BADYUM_MAX_PARTICIPANTS: ${BADYUM_MAX_PARTICIPANTS:-8}
+    expose:
+      - "8787"
+
+  # Без relay мобильные операторы за CGNAT не соединятся никогда. Это не
+  # опциональный компонент, а условие работы «вне геолокации».
+  coturn:
+    image: coturn/coturn:4.6
+    network_mode: host
+    restart: unless-stopped
+    command:
+      - --listening-port=3478
+      - --fingerprint
+      - --use-auth-secret
+      - --static-auth-secret=${BADYUM_TURN_SECRET:?сгенерируй, например openssl rand -hex 32}
+      - --realm=${BADYUM_DOMAIN}
+      - --external-ip=${BADYUM_TURN_EXTERNAL_IP:?белый IP этой машины}
+      - --min-port=49160
+      - --max-port=49200
+      - --no-tls
+      - --no-dtls
+      - --no-multicast-peers
+      # Не даём использовать relay как проход во внутреннюю сеть.
+      - --denied-peer-ip=10.0.0.0-10.255.255.255
+      - --denied-peer-ip=172.16.0.0-172.31.255.255
+      - --denied-peer-ip=192.168.0.0-192.168.255.255
+      - --denied-peer-ip=169.254.0.0-169.254.255.255
+      - --log-file=stdout
+
+volumes:
+  caddy-data:
+  caddy-config:

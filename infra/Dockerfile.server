@@ -1,0 +1,31 @@
+# Сигналинг-сервер.
+#
+# Сборки как таковой нет: Node исполняет TypeScript напрямую через
+# --experimental-strip-types, поэтому образ — это просто зависимости и исходники.
+FROM node:22-alpine
+
+RUN corepack enable
+
+WORKDIR /app
+
+# Сначала манифесты — слой с зависимостями переживает правки кода.
+COPY package.json pnpm-lock.yaml pnpm-workspace.yaml ./
+COPY packages/shared/package.json ./packages/shared/
+COPY packages/server/package.json ./packages/server/
+COPY packages/client/package.json ./packages/client/
+
+# Клиент серверу не нужен: его собирает и раздаёт отдельный образ.
+RUN pnpm install --frozen-lockfile --filter @badyum/server... --prod=false
+
+COPY packages/shared ./packages/shared
+COPY packages/server ./packages/server
+
+ENV NODE_ENV=production
+ENV HOST=0.0.0.0
+ENV PORT=8787
+EXPOSE 8787
+
+# Без своего пользователя контейнер крутил бы сеть от root.
+USER node
+
+CMD ["node", "--experimental-strip-types", "packages/server/src/index.ts"]

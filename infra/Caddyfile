@@ -1,0 +1,26 @@
+{$BADYUM_DOMAIN} {
+	encode zstd gzip
+
+	# API и сигналинг — на тот же домен, поэтому клиенту не нужен отдельный
+	# адрес сервера и не возникает CORS.
+	handle /api/* {
+		reverse_proxy server:8787
+	}
+
+	handle /ws {
+		reverse_proxy server:8787
+	}
+
+	handle {
+		root * /srv
+		# Ссылки-приглашения — это пути (/j/x7k2mq), а файла по такому пути нет.
+		# Без отдачи index.html человек по ссылке получал бы 404.
+		try_files {path} /index.html
+		file_server
+	}
+
+	header {
+		X-Content-Type-Options nosniff
+		Referrer-Policy strict-origin-when-cross-origin
+	}
+}
