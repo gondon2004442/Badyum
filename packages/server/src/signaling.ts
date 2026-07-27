@@ -8,7 +8,7 @@ import {
 import { MAX_PARTICIPANTS, iceServersFor } from "./config.ts";
 import type { ChannelStore } from "./channels.ts";
 import type { RoomRegistry } from "./rooms.ts";
-import { verifyJoinToken } from "./tokens.ts";
+import { signResumeToken, verifyJoinToken } from "./tokens.ts";
 
 interface Session {
   socket: WebSocket;
@@ -119,24 +119,38 @@ export function attachSignaling(
           });
         }
 
-        const result = deps.rooms.join({
-          channelId: claims.channelId,
-          userId: claims.userId,
-          displayName: claims.displayName,
-          muted: false,
-          deafened: false,
-          speaking: false,
-        });
-        if (!result.ok) {
-          return send(socket, {
-            type: "error",
-            code: result.error,
-            message:
-              result.error === "channel_full"
-                ? `в канале максимум ${MAX_PARTICIPANTS} человек`
-                : "уже в канале",
+        /**
+         * Возврат той же сессии.
+         *
+         * Телефон ушёл в сон или сеть моргнула — старый сокет остаётся зомби, и
+         * heartbeat замечает это лишь спустя десятки секунд. Всё это время
+         * человек не смог бы вернуться: комната считает, что он всё ещё внутри.
+         * Поэтому вход под уже присутствующим userId не ошибка, а перехват.
+         */
+        const resumed = deps.rooms.has(claims.channelId, claims.userId);
+
+        if (!resumed) {
+          const result = deps.rooms.join({
+            channelId: claims.channelId,
+            userId: claims.userId,
+            displayName: claims.displayName,
+            muted: false,
+            deafened: false,
+            speaking: false,
           });
+          if (!result.ok) {
+            return send(socket, {
+              type: "error",
+              code: result.error,
+              message:
+                result.error === "channel_full"
+                  ? `в канале максимум ${MAX_PARTICIPANTS} человек`
+                  : "уже в канале",
+            });
+          }
         }
+
+        const previous = sessions.get(claims.userId);
 
         session = {
           socket,
@@ -145,26 +159,52 @@ export function attachSignaling(
           displayName: claims.displayName,
           alive: true,
         };
+        // Подменяем запись до закрытия старого сокета: dropSession сверяется с
+        // картой сессий и поэтому не выкинет участника из комнаты.
         sessions.set(claims.userId, session);
+        if (previous && previous.socket !== socket) previous.socket.terminate();
+
         if (claims.inviteCode) deps.channels.consumeInvite(claims.inviteCode);
 
-        const self: Participant = {
-          userId: claims.userId,
-          displayName: claims.displayName,
-          muted: false,
-          deafened: false,
-          speaking: false,
-        };
+        const others = deps.rooms
+          .members(claims.channelId)
+          .filter((m) => m.userId !== claims.userId);
 
         send(socket, {
           type: "welcome",
           selfId: claims.userId,
           channelId: channel.id,
           channelName: channel.name,
-          participants: result.others.map(toParticipant),
+          resumeToken: signResumeToken({
+            userId: claims.userId,
+            channelId: claims.channelId,
+            displayName: claims.displayName,
+            inviteCode: null,
+          }),
+          resumed,
+          participants: others.map(toParticipant),
           iceServers: iceServersFor(claims.userId),
         });
-        broadcast(channel.id, { type: "peer_joined", participant: self }, claims.userId);
+
+        if (resumed) {
+          // Второй peer_joined только сбил бы остальных: для них человек и не
+          // уходил. Но предупредить надо — у кого-то соединение с ним могло
+          // остаться недостроенным, пока он был вне сети.
+          broadcast(
+            channel.id,
+            { type: "peer_resumed", userId: claims.userId },
+            claims.userId,
+          );
+        } else {
+          const self: Participant = {
+            userId: claims.userId,
+            displayName: claims.displayName,
+            muted: false,
+            deafened: false,
+            speaking: false,
+          };
+          broadcast(channel.id, { type: "peer_joined", participant: self }, claims.userId);
+        }
         return;
       }
 

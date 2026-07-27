@@ -87,6 +87,14 @@ export const serverMessageSchema = z.discriminatedUnion("type", [
     selfId: userIdSchema,
     channelId: z.string(),
     channelName: z.string(),
+    /**
+     * Токен для переподключения. Живёт заметно дольше входного и нужен ровно
+     * потому, что входной короткий: ушли с Wi-Fi на LTE, вернулись через пять
+     * минут — по исходному токену войти уже нельзя.
+     */
+    resumeToken: z.string(),
+    /** Это повторный вход той же сессии, а не первое появление в канале. */
+    resumed: z.boolean(),
     /** Снимок комнаты на момент входа, БЕЗ самого вошедшего. */
     participants: z.array(participantSchema),
     iceServers: z.array(
@@ -99,6 +107,15 @@ export const serverMessageSchema = z.discriminatedUnion("type", [
   }),
   z.object({ type: z.literal("peer_joined"), participant: participantSchema }),
   z.object({ type: z.literal("peer_left"), userId: userIdSchema }),
+  /**
+   * Участник вернулся после обрыва сигналинга.
+   *
+   * Его соединение с нами могло остаться наполовину собранным: наш offer ушёл
+   * в мёртвый сокет, а встречный он отвергнет как коллизию — и пара залипнет
+   * навсегда. Получив это, нужно проверить своё соединение с ним и пересобрать,
+   * если оно нерабочее.
+   */
+  z.object({ type: z.literal("peer_resumed"), userId: userIdSchema }),
   z.object({
     type: z.literal("signal"),
     from: userIdSchema,
