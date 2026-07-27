@@ -81,7 +81,7 @@ export function JoinScreen({ target, onJoined }: JoinScreenProps) {
           <div className="join__who">
             <div className="join__stack">
               {inside.slice(0, 3).map((p) => (
-                <Avatar key={p.userId} userId={p.userId} />
+                <Avatar key={p.userId} userId={p.userId} name={p.displayName} />
               ))}
             </div>
             {describeInside(inside.map((p) => p.displayName))}

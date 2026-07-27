@@ -21,17 +21,21 @@
   place-items: center;
   width: 52px;
   height: 52px;
-  border-radius: 15px;
+  border-radius: 3px;
   background: var(--accent-lime);
   color: var(--bg-base);
-  font-size: 27px;
+  font-family: var(--font-mono);
+  font-size: 26px;
   font-weight: 700;
   margin-bottom: 26px;
 }
 
 .join__kicker {
-  font-size: 13px;
-  color: var(--text-secondary);
+  font-family: var(--font-mono);
+  font-size: 10.5px;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--text-muted);
 }
 
 .join__channel {
@@ -46,27 +50,32 @@
   display: inline-flex;
   align-items: center;
   gap: 9px;
-  padding: 8px 14px 8px 8px;
-  border-radius: var(--radius-pill);
+  padding: 7px 12px 7px 7px;
+  border-radius: var(--radius-md);
   background: var(--bg-surface);
-  font-size: 12px;
+  border: 1px solid var(--border-subtle);
+  font-family: var(--font-mono);
+  font-size: 10.5px;
   color: var(--text-secondary);
   margin-bottom: 34px;
 }
 
 .join__stack {
   display: flex;
+  gap: 3px;
 }
 
 .join__stack > * {
-  width: 26px;
-  height: 26px;
-  border-radius: 50%;
-  border: 2px solid var(--bg-surface);
-}
-
-.join__stack > * + * {
-  margin-left: -9px;
+  display: grid;
+  place-items: center;
+  width: 24px;
+  height: 24px;
+  border-radius: var(--radius-sm);
+  border: 1px solid currentColor;
+  background: var(--bg-elevated);
+  font-family: var(--font-mono);
+  font-size: 9px;
+  font-weight: 700;
 }
 
 .join__field {
@@ -93,19 +102,25 @@
 }
 
 .join__label {
-  font-size: 12px;
+  font-family: var(--font-mono);
+  font-size: 10.5px;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
   color: var(--text-muted);
   margin: 10px 0 26px;
 }
 
 .join__cta {
   width: 100%;
-  padding: 18px;
-  border-radius: var(--radius-pill);
+  padding: 17px;
+  border-radius: var(--radius-md);
   background: var(--accent-lime);
   color: var(--bg-base);
-  font-size: 15px;
+  font-family: var(--font-mono);
+  font-size: 13px;
   font-weight: 700;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
   transition: filter 0.15s ease;
 }
 

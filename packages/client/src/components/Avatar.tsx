@@ -1,18 +1,18 @@
 /**
- * Аватар-градиент, детерминированно выведенный из userId.
+ * Аватар — плоский квадрат с моноширинными инициалами и одним акцентным цветом.
  *
- * Пока нет загрузки картинок, участник всё равно должен быть узнаваем с одного
- * взгляда — одинаковые серые кружки в канале на шесть человек бесполезны.
- * Один и тот же человек всегда одного цвета.
+ * Пока нет загрузки картинок, участник всё равно должен опознаваться с одного
+ * взгляда: одинаковые серые кружки в канале на шесть человек бесполезны. Цвет
+ * выводится из userId, поэтому один и тот же человек всегда одного цвета.
  */
 
-const PALETTE: [string, string][] = [
-  ["#c3f53c", "#3de8b0"],
-  ["#6b8cfa", "#a65cf2"],
-  ["#ffb020", "#ff4d5e"],
-  ["#3de8b0", "#6b8cfa"],
-  ["#ff7ac6", "#ffb020"],
-  ["#4fd1ff", "#3de8b0"],
+const ACCENTS = [
+  "var(--accent-lime)",
+  "var(--accent-mint)",
+  "var(--status-warn)",
+  "#6b8cfa",
+  "#ff7ac6",
+  "#4fd1ff",
 ];
 
 function hash(input: string): number {
@@ -23,27 +23,38 @@ function hash(input: string): number {
   return Math.abs(value);
 }
 
-export function gradientFor(userId: string): string {
-  const pair = PALETTE[hash(userId) % PALETTE.length] ?? PALETTE[0]!;
-  return `linear-gradient(135deg, ${pair[0]}, ${pair[1]})`;
+export function accentFor(userId: string): string {
+  return ACCENTS[hash(userId) % ACCENTS.length] ?? ACCENTS[0]!;
+}
+
+/** Две буквы без служебного хвоста вида «(ты)». */
+function initialsOf(name: string): string {
+  const clean = name.replace(/\s*\(.*\)\s*$/, "").trim();
+  return (clean.slice(0, 2) || "??").toUpperCase();
 }
 
 interface AvatarProps {
   userId: string;
+  name: string;
   size?: number;
   dimmed?: boolean;
   className?: string;
 }
 
-export function Avatar({ userId, size, dimmed, className }: AvatarProps) {
+export function Avatar({ userId, name, size, dimmed, className }: AvatarProps) {
+  const accent = accentFor(userId);
+
   return (
-    <div
+    <span
       className={className}
+      data-avatar=""
       style={{
-        background: gradientFor(userId),
-        opacity: dimmed ? 0.55 : 1,
-        ...(size ? { width: size, height: size, borderRadius: "50%" } : null),
+        color: accent,
+        opacity: dimmed ? 0.5 : 1,
+        ...(size ? { width: size, height: size } : null),
       }}
-    />
+    >
+      {initialsOf(name)}
+    </span>
   );
 }

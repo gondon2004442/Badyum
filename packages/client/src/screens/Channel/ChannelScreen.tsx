@@ -163,6 +163,7 @@ function Tile({ userId, name, speaking, muted, isSelf, volume, onVolume }: TileP
       <div className={`tile__ring ${speaking ? "tile__ring--speaking" : ""}`}>
         <Avatar
           userId={userId}
+          name={name}
           className={`tile__avatar ${muted ? "tile__avatar--muted" : ""}`}
         />
       </div>
@@ -174,8 +175,8 @@ function Tile({ userId, name, speaking, muted, isSelf, volume, onVolume }: TileP
           muted ? "tile__status--muted" : speaking ? "tile__status--speaking" : ""
         }`}
       >
-        {muted ? <MicOffIcon size={13} /> : <MicIcon size={13} />}
-        {muted ? "микрофон выкл" : speaking ? "говорит" : "в канале"}
+        {muted ? <MicOffIcon size={12} /> : <MicIcon size={12} />}
+        {muted ? "мик выкл" : speaking ? "говорит" : "в канале"}
       </span>
 
       {!isSelf && onVolume ? (
@@ -211,7 +212,7 @@ function QualityPill({ quality }: { quality: ConnectionQuality }) {
           : 3;
 
   const tone = level >= 3 ? "good" : level === 2 ? "fair" : level === 1 ? "poor" : "fair";
-  const label = rttMs === null ? "…" : `${rttMs} мс`;
+  const label = rttMs === null ? "--- мс" : `${rttMs} мс`;
 
   return (
     <span className={`quality quality--${tone}`} title={quality.relayed ? "через relay" : ""}>
