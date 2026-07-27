@@ -24,6 +24,7 @@ export class SignalingSocket {
   private reconnectTimer: number | null = null;
   private closedByUs = false;
   private pendingToken: string | null = null;
+  private readonly stateSubs = new Set<(online: boolean) => void>();
 
   constructor(url: string) {
     this.url = url;
@@ -46,6 +47,7 @@ export class SignalingSocket {
       if (this.pendingToken) {
         this.send({ type: "join", token: this.pendingToken });
       }
+      this.emitState(true);
     };
 
     socket.onmessage = (event) => {
@@ -63,6 +65,7 @@ export class SignalingSocket {
     socket.onclose = () => {
       this.socket = null;
       if (this.closedByUs) return;
+      this.emitState(false);
       this.scheduleReconnect();
     };
 
@@ -93,6 +96,25 @@ export class SignalingSocket {
     return () => this.listeners.delete(listener);
   }
 
+  /**
+   * Токен, которым представляемся при следующем переподключении.
+   *
+   * Входной токен живёт две минуты — он не пережил бы даже поездку в лифте.
+   * Как только сервер прислал resume-токен, дальше пользуемся им.
+   */
+  useResumeToken(token: string): void {
+    this.pendingToken = token;
+  }
+
+  onConnectionState(listener: (online: boolean) => void): () => void {
+    this.stateSubs.add(listener);
+    return () => this.stateSubs.delete(listener);
+  }
+
+  private emitState(online: boolean): void {
+    for (const listener of this.stateSubs) listener(online);
+  }
+
   close(): void {
     this.closedByUs = true;
     this.pendingToken = null;
@@ -103,5 +125,6 @@ export class SignalingSocket {
     this.socket?.close();
     this.socket = null;
     this.listeners.clear();
+    this.stateSubs.clear();
   }
 }

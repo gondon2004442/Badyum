@@ -104,6 +104,36 @@ describe("мьюты", () => {
   });
 });
 
+describe("возврат в канал", () => {
+  it("участник остаётся в комнате, пока его не убрали явно", () => {
+    // Сигналинг опирается на это: при возврате он видит userId в комнате и
+    // перехватывает сессию вместо повторного join.
+    const rooms = new RoomRegistry(8);
+    rooms.join(member("a"));
+    rooms.setState("ch1", "a", { muted: true });
+
+    assert.ok(rooms.has("ch1", "a"));
+    const again = rooms.join(member("a"));
+    assert.ok(!again.ok);
+    assert.equal(again.error, "already_joined");
+
+    // Состояние переживает попытку повторного входа
+    const found = rooms.members("ch1").find((m) => m.userId === "a");
+    assert.equal(found?.muted, true);
+  });
+
+  it("вернувшийся не считается новым участником", () => {
+    const rooms = new RoomRegistry(2);
+    rooms.join(member("a"));
+    rooms.join(member("b"));
+
+    // Комната уже полна; возврат "a" не должен упереться в лимит,
+    // потому что он и не выходил
+    assert.ok(rooms.has("ch1", "a"));
+    assert.equal(rooms.size("ch1"), 2);
+  });
+});
+
 describe("perfect negotiation", () => {
   it("роли в паре всегда противоположны — иначе glare", () => {
     const ids = ["a", "b", "zzz", "0", "d4e5", "d4e6"];

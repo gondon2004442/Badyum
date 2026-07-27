@@ -74,6 +74,13 @@ export class MeshEngine implements VoiceEngine {
     this.attachVad();
 
     this.socket.on((msg) => this.handleServerMessage(msg));
+
+    // Обрыв сигналинга сам по себе не рвёт звук, но состав канала мы больше не
+    // узнаём — и молчать об этом нельзя, иначе тишина выглядит поломкой.
+    this.socket.onConnectionState((online) => {
+      if (!online) this.setQuality({ status: "reconnecting" });
+    });
+
     this.socket.connect(token);
 
     this.statsTimer = window.setInterval(() => void this.pollStats(), STATS_INTERVAL_MS);
@@ -206,13 +213,34 @@ export class MeshEngine implements VoiceEngine {
       case "welcome": {
         this.selfId = msg.selfId;
         this.iceServers = msg.iceServers as RTCIceServer[];
-        this.participants.clear();
+        // Дальше переподключаемся по нему: входной токен живёт две минуты.
+        this.socket.useResumeToken(msg.resumeToken);
 
-        // Инициатива за новичком: он создаёт соединения ко всем, кто уже внутри.
+        const present = new Set(msg.participants.map((p) => p.userId));
+
+        // Пока сигналинг лежал, кто-то мог уйти. Медиа с ним уже мёртвое.
+        for (const [userId, peer] of this.peers) {
+          if (present.has(userId)) continue;
+          peer.close();
+          this.peers.delete(userId);
+          this.mixer?.remove(userId);
+        }
+        for (const userId of [...this.participants.keys()]) {
+          if (!present.has(userId)) this.participants.delete(userId);
+        }
+
         for (const participant of msg.participants) {
           this.upsertParticipant(participant);
-          this.createPeer(participant.userId);
+
+          // Соединение создаём только если его ещё нет. При возврате живые
+          // peer-соединения не трогаем: медиа идёт напрямую и обрыв сигналинга
+          // переживает. А вот с теми, кто вошёл, пока мы были offline, связи
+          // нет — их offer ушёл в мёртвый сокет, и инициировать должны мы.
+          if (!this.peers.has(participant.userId)) {
+            this.createPeer(participant.userId);
+          }
         }
+
         this.setQuality({ status: "connected" });
         this.emitParticipants();
         return;
@@ -221,6 +249,27 @@ export class MeshEngine implements VoiceEngine {
       case "peer_joined": {
         this.upsertParticipant(msg.participant);
         // Соединение создаст он сам — иначе получим два offer навстречу.
+        this.emitParticipants();
+        return;
+      }
+
+      case "peer_resumed": {
+        const peer = this.peers.get(msg.userId);
+
+        // Медиа идёт напрямую и переживает обрыв сигналинга. Если соединение
+        // живо — трогать его нельзя, пересборка оборвала бы работающий звук.
+        if (peer && peer.isConnected()) return;
+
+        // Иначе оно недостроено: наш offer ушёл в никуда, пока он был offline.
+        // Пересобираем начисто — иначе пара залипнет навсегда.
+        peer?.close();
+        this.peers.delete(msg.userId);
+        this.mixer?.remove(msg.userId);
+
+        const participant = this.participants.get(msg.userId);
+        if (participant) participant.hasStream = false;
+
+        this.createPeer(msg.userId);
         this.emitParticipants();
         return;
       }

@@ -1,5 +1,12 @@
 import { isPolite, type SignalPayload } from "@badyum/shared";
 
+/**
+ * Сколько терпим `disconnected` до принудительного ICE restart. Короткие
+ * просадки сети рассасываются сами, и рестарт на каждую из них рвал бы звук
+ * чаще, чем чинил.
+ */
+const ICE_GRACE_MS = 3000;
+
 interface PeerCallbacks {
   sendSignal: (payload: SignalPayload) => void;
   onTrack: (stream: MediaStream) => void;
@@ -34,6 +41,8 @@ export class Peer {
   private closed = false;
   /** Хвост очереди применения сигналов, см. acceptSignal. */
   private queue: Promise<void> = Promise.resolve();
+  /** Выдержка перед ICE restart в состоянии disconnected. */
+  private iceGraceTimer: ReturnType<typeof setTimeout> | null = null;
 
   constructor(opts: {
     selfId: string;
@@ -106,11 +115,30 @@ export class Peer {
     };
 
     this.pc.oniceconnectionstatechange = () => {
+      const state = this.pc.iceConnectionState;
+
       // ICE restart — единственное, что вытаскивает соединение после смены сети
       // (ушли с Wi-Fi на LTE) без полного пересоздания.
-      if (this.pc.iceConnectionState === "failed") {
+      if (state === "failed") {
+        this.clearIceGrace();
         this.pc.restartIce();
+        return;
       }
+
+      // `disconnected` часто рассасывается сам за секунду-другую, и рестарт
+      // здесь только оборвал бы живой звук. Но если состояние держится, ждать
+      // перехода в `failed` дорого: браузер тянет с этим десятки секунд.
+      if (state === "disconnected") {
+        this.clearIceGrace();
+        this.iceGraceTimer = setTimeout(() => {
+          this.iceGraceTimer = null;
+          if (this.closed) return;
+          if (this.pc.iceConnectionState === "disconnected") this.pc.restartIce();
+        }, ICE_GRACE_MS);
+        return;
+      }
+
+      if (state === "connected" || state === "completed") this.clearIceGrace();
     };
   }
 
@@ -219,9 +247,21 @@ export class Peer {
     return { rttMs, packetLoss, relayed };
   }
 
+  /** Есть ли рабочее медиа-соединение прямо сейчас. */
+  isConnected(): boolean {
+    return !this.closed && this.pc.connectionState === "connected";
+  }
+
+  private clearIceGrace(): void {
+    if (this.iceGraceTimer === null) return;
+    clearTimeout(this.iceGraceTimer);
+    this.iceGraceTimer = null;
+  }
+
   close(): void {
     if (this.closed) return;
     this.closed = true;
+    this.clearIceGrace();
     this.pc.onnegotiationneeded = null;
     this.pc.onicecandidate = null;
     this.pc.ontrack = null;
