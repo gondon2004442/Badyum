@@ -1,0 +1,33 @@
+services:
+  # TURN-relay. Не опциональный компонент: мобильные операторы и корпоративные
+  # сети сидят за symmetric NAT / CGNAT, где прямое P2P не устанавливается
+  # никогда. Без него звонки с телефона работают "через раз" и выглядят как
+  # случайный баг.
+  coturn:
+    image: coturn/coturn:4.6
+    network_mode: host
+    restart: unless-stopped
+    command:
+      - --listening-port=3478
+      - --fingerprint
+      # Короткоживущие креды по HMAC вместо статического логина: конфиг клиента
+      # виден в DevTools, и статический пароль превращает relay в чужой прокси.
+      - --use-auth-secret
+      - --static-auth-secret=${BADYUM_TURN_SECRET:?задай BADYUM_TURN_SECRET}
+      - --realm=badyum.local
+      # Внешний IP машины. За NAT (домашний сервер, облако с white IP через NAT)
+      # без него coturn раздаёт неверные кандидаты и relay молча не работает.
+      - --external-ip=${BADYUM_TURN_EXTERNAL_IP:?задай BADYUM_TURN_EXTERNAL_IP}
+      - --min-port=49160
+      - --max-port=49200
+      # Голос — это UDP. TCP-релей оставлен как запасной путь для сетей,
+      # которые режут UDP целиком.
+      - --no-tls
+      - --no-dtls
+      - --no-multicast-peers
+      # Не даём использовать relay для похода во внутреннюю сеть.
+      - --denied-peer-ip=10.0.0.0-10.255.255.255
+      - --denied-peer-ip=172.16.0.0-172.31.255.255
+      - --denied-peer-ip=192.168.0.0-192.168.255.255
+      - --denied-peer-ip=169.254.0.0-169.254.255.255
+      - --log-file=stdout

@@ -1,0 +1,74 @@
+export interface JoinResponse {
+  token: string;
+  channelId: string;
+  channelName: string;
+}
+
+export interface PreviewResponse {
+  exists: boolean;
+  channelId?: string;
+  channelName: string;
+  participants: { userId: string; displayName: string }[];
+}
+
+export class ApiError extends Error {
+  readonly code: string;
+
+  constructor(code: string, message: string) {
+    super(message);
+    this.code = code;
+    this.name = "ApiError";
+  }
+}
+
+const MESSAGES: Record<string, string> = {
+  not_found: "Такого канала нет — возможно, ссылка устарела",
+  invite_expired: "Ссылка больше не действует",
+  invite_exhausted: "По этой ссылке уже вошли все, кого звали",
+  channel_full: "В канале нет свободных мест",
+  bad_input: "Не разобрал ссылку или код",
+  bad_display_name: "Такое имя не подойдёт",
+};
+
+async function request<T>(path: string, init?: RequestInit): Promise<T> {
+  const response = await fetch(path, {
+    ...init,
+    headers: { "content-type": "application/json", ...init?.headers },
+  });
+
+  if (!response.ok) {
+    const body = (await response.json().catch(() => ({}))) as { error?: string };
+    const code = body.error ?? "unknown";
+    throw new ApiError(code, MESSAGES[code] ?? "Что-то пошло не так");
+  }
+  return (await response.json()) as T;
+}
+
+/** Что за канал за ссылкой — показываем до того, как просить имя. */
+export function previewChannel(input: { code?: string; slug?: string }): Promise<PreviewResponse> {
+  const params = new URLSearchParams();
+  if (input.code) params.set("code", input.code);
+  if (input.slug) params.set("slug", input.slug);
+  return request<PreviewResponse>(`/api/preview?${params}`);
+}
+
+export function requestJoin(input: {
+  displayName: string;
+  code?: string;
+  slug?: string;
+  channelId?: string;
+}): Promise<JoinResponse> {
+  return request<JoinResponse>("/api/join", {
+    method: "POST",
+    body: JSON.stringify(input),
+  });
+}
+
+export function fetchInviteCode(channelId: string): Promise<{ code: string }> {
+  return request<{ code: string }>(`/api/channels/${channelId}/invite`);
+}
+
+export function wsUrl(): string {
+  const protocol = location.protocol === "https:" ? "wss:" : "ws:";
+  return `${protocol}//${location.host}/ws`;
+}

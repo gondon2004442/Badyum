@@ -1,0 +1,19 @@
+{
+  "name": "badyum",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "engines": {
+    "node": ">=22"
+  },
+  "scripts": {
+    "dev": "pnpm --parallel --filter \"./packages/*\" dev",
+    "build": "pnpm --filter \"./packages/*\" build",
+    "typecheck": "pnpm --filter \"./packages/*\" typecheck",
+    "test": "pnpm --filter \"./packages/*\" test",
+    "turn": "docker compose -f infra/docker-compose.yml up -d"
+  },
+  "devDependencies": {
+    "typescript": "^5.7.3"
+  }
+}
