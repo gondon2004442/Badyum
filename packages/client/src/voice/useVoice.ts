@@ -7,6 +7,7 @@ import type {
   VoiceParticipant,
 } from "./VoiceEngine.ts";
 import { wsUrl } from "../api.ts";
+import { InsecureContextError } from "./audio/devices.ts";
 
 
 /**
@@ -68,11 +69,7 @@ export function useVoice() {
       try {
         await engine.join({ token });
       } catch (err) {
-        setError(
-          err instanceof DOMException && err.name === "NotAllowedError"
-            ? "Нужен доступ к микрофону — разреши его в настройках браузера"
-            : "Не получилось включить микрофон",
-        );
+        setError(describeMicError(err));
         throw err;
       }
     },
@@ -94,6 +91,30 @@ export function useVoice() {
       [engine],
     ),
   };
+}
+
+/**
+ * Почему микрофон не включился — словами, из которых понятно, что делать.
+ *
+ * Разница принципиальная: «разреши доступ» бесполезно, когда разрешать негде,
+ * а именно так выглядит открытие страницы по локальному IP.
+ */
+function describeMicError(error: unknown): string {
+  if (error instanceof InsecureContextError) {
+    return "Браузер отдаёт микрофон только по https или на localhost. По локальному IP это невозможно — открой через https-туннель.";
+  }
+  if (error instanceof DOMException) {
+    if (error.name === "NotAllowedError") {
+      return "Нужен доступ к микрофону — разреши его в настройках браузера";
+    }
+    if (error.name === "NotFoundError") {
+      return "Микрофон не найден — проверь, что он подключён";
+    }
+    if (error.name === "NotReadableError") {
+      return "Микрофон занят другим приложением";
+    }
+  }
+  return "Не получилось включить микрофон";
 }
 
 /**
