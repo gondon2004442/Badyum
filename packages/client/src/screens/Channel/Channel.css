@@ -1,0 +1,506 @@
+.channel {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  background: var(--bg-base);
+  padding-top: var(--safe-top);
+}
+
+/* --- Шапка --- */
+
+.channel__header {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  padding: 14px var(--space-6);
+  flex-shrink: 0;
+}
+
+/* Имя канала важнее всего в шапке — оно и получает свободное место, а сжимаются
+   элементы справа. Иначе на узком экране название усыхает до одной буквы. */
+.channel__identity {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  flex: 1;
+  min-width: 0;
+}
+
+.channel__icon {
+  color: var(--accent-lime);
+  flex-shrink: 0;
+}
+
+.channel__name {
+  font-size: 16px;
+  font-weight: 700;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.channel__count {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  color: var(--text-secondary);
+  white-space: nowrap;
+}
+
+.channel__dot {
+  width: 3px;
+  height: 3px;
+  border-radius: 50%;
+  background: var(--text-muted);
+  flex-shrink: 0;
+}
+
+.channel__spacer {
+  flex: 0 0 var(--space-2);
+}
+
+/* Индикатор качества. Цвет меняется вместе с реальностью, а не остаётся
+   зелёным, когда связь сыпется. */
+.quality {
+  display: flex;
+  align-items: center;
+  flex-shrink: 0;
+  gap: 7px;
+  padding: 6px 10px;
+  border-radius: var(--radius-md);
+  background: var(--bg-surface);
+  border: 1px solid var(--border-subtle);
+  font-family: var(--font-mono);
+  font-variant-numeric: tabular-nums;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  white-space: nowrap;
+}
+
+.quality--good {
+  color: var(--accent-mint);
+}
+.quality--fair {
+  color: var(--status-warn);
+}
+.quality--poor {
+  color: var(--status-danger);
+}
+
+.quality__bars {
+  display: flex;
+  align-items: flex-end;
+  gap: 2px;
+  height: 11px;
+}
+
+.quality__bar {
+  width: 3px;
+  background: currentColor;
+  opacity: 0.22;
+}
+
+.quality__bar--on {
+  opacity: 1;
+}
+
+.quality__bar:nth-child(1) {
+  height: 5px;
+}
+.quality__bar:nth-child(2) {
+  height: 8px;
+}
+.quality__bar:nth-child(3) {
+  height: 11px;
+}
+
+.btn-invite {
+  display: inline-flex;
+  align-items: center;
+  flex-shrink: 0;
+  gap: 7px;
+  padding: 8px 14px;
+  border-radius: var(--radius-md);
+  background: var(--accent-lime);
+  color: var(--bg-base);
+  font-family: var(--font-mono);
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.07em;
+  text-transform: uppercase;
+  transition: filter 0.15s ease;
+}
+
+.btn-invite:hover {
+  filter: brightness(1.08);
+}
+
+/* --- Сетка участников --- */
+
+.stage {
+  flex: 1;
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: 14px;
+  padding: 6px var(--space-6);
+  align-content: center;
+  overflow-y: auto;
+  min-height: 0;
+  /* На широком мониторе без потолка плитки растягиваются в тонкую полосу
+     через весь экран и перестают читаться боковым зрением. */
+  width: 100%;
+  max-width: 1180px;
+  margin: 0 auto;
+}
+
+.tile {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-3);
+  min-height: 196px;
+  padding: var(--space-4);
+  border-radius: var(--radius-lg);
+  background: var(--bg-surface);
+  border: 1px solid var(--border-subtle);
+}
+
+/* Рамка вплотную к аватару: выделение в интерфейсе, а не ореол вокруг иконки */
+.tile__ring {
+  display: grid;
+  place-items: center;
+  padding: 3px;
+  border-radius: var(--radius-md);
+  border: 1px solid var(--border-subtle);
+  transition:
+    border-color 0.1s linear,
+    background-color 0.1s linear;
+}
+
+/* Основной сигнал «говорит»: контур загорается акцентом. Без пульсации —
+   мигающий ореол перетягивает внимание с игры на интерфейс. */
+.tile__ring--speaking {
+  border-color: var(--accent-lime);
+  background: rgba(195, 245, 60, 0.07);
+}
+
+.tile__avatar {
+  display: grid;
+  place-items: center;
+  width: 70px;
+  height: 70px;
+  border-radius: var(--radius-sm);
+  background: var(--bg-elevated);
+  font-family: var(--font-mono);
+  font-size: 22px;
+  font-weight: 700;
+  letter-spacing: 0.03em;
+}
+
+.tile__avatar--muted {
+  opacity: 0.5;
+}
+
+.tile__name {
+  font-size: 14px;
+  font-weight: 600;
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.tile__name--dim {
+  color: var(--text-secondary);
+}
+
+.tile__status {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 9px;
+  border-radius: var(--radius-sm);
+  background: var(--bg-elevated);
+  font-family: var(--font-mono);
+  font-size: 10px;
+  font-weight: 500;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--text-muted);
+}
+
+.tile__status--speaking {
+  color: var(--accent-lime);
+}
+.tile__status--muted {
+  color: var(--status-danger);
+}
+
+.tile__volume {
+  width: 100%;
+  max-width: 150px;
+  accent-color: var(--accent-lime);
+}
+
+/* --- Плитка приглашения: пустое место никогда не тупик --- */
+
+.invite-tile {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  min-height: 196px;
+  padding: var(--space-4);
+  border-radius: var(--radius-lg);
+  border: 1.5px dashed var(--border-strong);
+  text-align: center;
+}
+
+.invite-tile__qr {
+  width: 72px;
+  height: 72px;
+  border-radius: var(--radius-sm);
+  background: var(--text-primary);
+  padding: 6px;
+}
+
+.invite-tile__link {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+  color: var(--accent-lime);
+  word-break: break-all;
+}
+
+.invite-tile__hint {
+  font-size: 11px;
+  color: var(--text-muted);
+  line-height: 1.4;
+  white-space: pre-line;
+}
+
+/* --- Панель управления --- */
+
+.controls {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-3);
+  padding: 18px var(--space-6);
+  padding-bottom: calc(18px + var(--safe-bottom));
+  background: var(--bg-surface);
+  flex-shrink: 0;
+}
+
+.ptt {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 140px;
+}
+
+.ptt__label {
+  font-family: var(--font-mono);
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--text-secondary);
+}
+
+.ptt__row {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  font-family: var(--font-mono);
+  font-size: 10px;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  color: var(--text-muted);
+}
+
+.ptt__key {
+  padding: 2px 5px;
+  border-radius: var(--radius-sm);
+  background: var(--bg-elevated);
+  border: 1px solid var(--border-subtle);
+  font-size: 9.5px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  color: var(--text-secondary);
+}
+
+.controls__group {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.ctrl {
+  display: grid;
+  place-items: center;
+  width: 48px;
+  height: 48px;
+  border-radius: var(--radius-md);
+  background: var(--bg-elevated);
+  border: 1px solid var(--border-subtle);
+  color: var(--text-primary);
+  transition:
+    background 0.12s linear,
+    border-color 0.12s linear;
+}
+
+.ctrl:hover {
+  background: var(--bg-hover);
+  border-color: var(--border-strong);
+}
+
+.ctrl--on {
+  background: var(--accent-lime);
+  border-color: var(--accent-lime);
+  color: var(--bg-base);
+}
+
+.ctrl--on:hover {
+  background: var(--accent-lime);
+  border-color: var(--accent-lime);
+  filter: brightness(1.08);
+}
+
+.ctrl--danger {
+  background: var(--status-danger);
+  border-color: var(--status-danger);
+}
+
+.ctrl--leave {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  width: auto;
+  padding: 14px 18px;
+  border-radius: var(--radius-md);
+  background: var(--status-danger);
+  border-color: var(--status-danger);
+  font-family: var(--font-mono);
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.07em;
+  text-transform: uppercase;
+}
+
+.ctrl--leave:hover {
+  background: var(--status-danger);
+  border-color: var(--status-danger);
+  filter: brightness(1.08);
+}
+
+.controls__right {
+  min-width: 140px;
+  display: flex;
+  justify-content: flex-end;
+}
+
+/* --- Баннер состояния: молчать при обрыве нельзя --- */
+
+.banner {
+  padding: 9px var(--space-6);
+  font-family: var(--font-mono);
+  font-size: 11px;
+  font-weight: 500;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  text-align: center;
+  flex-shrink: 0;
+}
+
+.banner--warn {
+  background: rgba(255, 176, 32, 0.14);
+  color: var(--status-warn);
+}
+
+.banner--error {
+  background: rgba(255, 77, 94, 0.14);
+  color: var(--status-danger);
+}
+
+/* --- Мобильная раскладка --- */
+
+@media (max-width: 720px) {
+  .channel__header {
+    padding: 10px var(--space-4);
+  }
+
+  .stage {
+    grid-template-columns: repeat(2, 1fr);
+    gap: var(--space-3);
+    padding: 6px var(--space-4);
+  }
+
+  .tile {
+    min-height: 0;
+    gap: 9px;
+    border-radius: 18px;
+  }
+
+  .tile__avatar {
+    width: 52px;
+    height: 52px;
+    font-size: 17px;
+  }
+
+  .tile__volume {
+    display: none;
+  }
+
+  /* Освобождаем место названию канала: иконка говорит сама за себя */
+  .btn-invite {
+    padding: 9px;
+    border-radius: 50%;
+  }
+
+  .btn-invite span {
+    display: none;
+  }
+
+  .channel__dot,
+  .channel__count {
+    display: none;
+  }
+
+  /* Рация — десктопная история: в браузере на телефоне глобального
+     хоткея нет и быть не может. */
+  .ptt,
+  .controls__right {
+    display: none;
+  }
+
+  .controls {
+    justify-content: center;
+    gap: var(--space-4);
+    padding: 16px var(--space-4);
+    padding-bottom: calc(12px + var(--safe-bottom));
+  }
+
+  /* Пальцем, одной рукой, не глядя */
+  .ctrl {
+    width: 60px;
+    height: 60px;
+  }
+
+  .ctrl--leave {
+    width: 60px;
+    height: 60px;
+    padding: 0;
+    border-radius: var(--radius-md);
+  }
+
+  .ctrl--leave span {
+    display: none;
+  }
+}

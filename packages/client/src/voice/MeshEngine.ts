@@ -1,0 +1,375 @@
+import type { Participant, SignalPayload } from "@badyum/shared";
+import type {
+  ConnectionQuality,
+  JoinOptions,
+  Unsub,
+  VoiceEngine,
+  VoiceParticipant,
+} from "./VoiceEngine.ts";
+import { Peer } from "./peer.ts";
+import { SignalingSocket } from "./signalingSocket.ts";
+import { Mixer } from "./audio/mixer.ts";
+import { createVad, type VadHandle } from "./audio/vad.ts";
+import { captureMicrophone, createAudioContext } from "./audio/devices.ts";
+
+const STATS_INTERVAL_MS = 3000;
+
+/**
+ * P2P mesh: с каждым собеседником отдельное соединение.
+ *
+ * Честная граница применимости — примерно до 6 человек. Дальше исходящий поток
+ * растёт линейно с числом участников (каждому шлём свою копию), и upstream
+ * домашнего интернета кончается раньше, чем терпение. Именно поэтому
+ * существует VoiceEngine: замена этого класса на SfuEngine не трогает UI.
+ */
+export class MeshEngine implements VoiceEngine {
+  private readonly socket: SignalingSocket;
+
+  private context: AudioContext | null = null;
+  private mixer: Mixer | null = null;
+  private localStream: MediaStream | null = null;
+  private vad: VadHandle | null = null;
+
+  private selfId: string | null = null;
+  private readonly peers = new Map<string, Peer>();
+  private readonly participants = new Map<string, VoiceParticipant>();
+
+  private muted = false;
+  private deafened = false;
+  private speaking = false;
+  /** Push-to-talk: false означает «сейчас не передаём», но мьют не выставлен. */
+  private transmitting = true;
+
+  private quality: ConnectionQuality = {
+    status: "idle",
+    rttMs: null,
+    packetLoss: null,
+    relayed: false,
+  };
+  private iceServers: RTCIceServer[] = [];
+  private statsTimer: number | null = null;
+
+  private readonly participantsSubs = new Set<(p: VoiceParticipant[]) => void>();
+  private readonly selfSubs = new Set<
+    (s: { muted: boolean; deafened: boolean; speaking: boolean }) => void
+  >();
+  private readonly qualitySubs = new Set<(q: ConnectionQuality) => void>();
+  private readonly errorSubs = new Set<(e: { code: string; message: string }) => void>();
+
+  constructor(wsUrl: string) {
+    this.socket = new SignalingSocket(wsUrl);
+  }
+
+  async join({ token, inputDeviceId }: JoinOptions): Promise<void> {
+    this.setQuality({ status: "connecting" });
+
+    // Микрофон берём до сигналинга: отказ в правах должен быть виден сразу,
+    // а не после того, как мы уже показались остальным в канале.
+    this.localStream = await captureMicrophone(inputDeviceId);
+
+    this.context = createAudioContext();
+    await this.context.resume();
+    this.mixer = new Mixer(this.context);
+
+    this.attachVad();
+
+    this.socket.on((msg) => this.handleServerMessage(msg));
+    this.socket.connect(token);
+
+    this.statsTimer = window.setInterval(() => void this.pollStats(), STATS_INTERVAL_MS);
+  }
+
+  async leave(): Promise<void> {
+    this.socket.send({ type: "leave" });
+    this.socket.close();
+
+    if (this.statsTimer !== null) {
+      clearInterval(this.statsTimer);
+      this.statsTimer = null;
+    }
+
+    for (const peer of this.peers.values()) peer.close();
+    this.peers.clear();
+    this.participants.clear();
+
+    this.vad?.stop();
+    this.vad = null;
+
+    this.mixer?.destroy();
+    this.mixer = null;
+
+    for (const track of this.localStream?.getTracks() ?? []) track.stop();
+    this.localStream = null;
+
+    await this.context?.close();
+    this.context = null;
+    this.selfId = null;
+
+    this.setQuality({ status: "idle", rttMs: null, packetLoss: null, relayed: false });
+    this.emitParticipants();
+  }
+
+  // -------------------------------------------------------------------------
+  // Управление
+  // -------------------------------------------------------------------------
+
+  setMuted(muted: boolean): void {
+    this.muted = muted;
+    if (!muted) this.deafened = false;
+    this.applyTrackState();
+    this.socket.send({ type: "state", muted: this.muted, deafened: this.deafened });
+    this.emitSelf();
+  }
+
+  setDeafened(deafened: boolean): void {
+    this.deafened = deafened;
+    // Оглохнуть и продолжать говорить — состояние, которого никто не ожидает.
+    if (deafened) this.muted = true;
+    this.mixer?.setDeafened(deafened);
+    this.applyTrackState();
+    this.socket.send({ type: "state", muted: this.muted, deafened: this.deafened });
+    this.emitSelf();
+  }
+
+  setTransmitting(on: boolean): void {
+    this.transmitting = on;
+    this.applyTrackState();
+  }
+
+  async setInputDevice(deviceId: string): Promise<void> {
+    const next = await captureMicrophone(deviceId);
+    const nextTrack = next.getAudioTracks()[0];
+    if (!nextTrack) return;
+
+    // Меняем трек в живых соединениях через replaceTrack: пересогласование
+    // здесь означало бы разрыв звука у всех разом.
+    await Promise.all(
+      [...this.peers.values()].map((peer) => peer.replaceAudioTrack(nextTrack)),
+    );
+
+    const oldStream = this.localStream;
+    this.localStream = next;
+    this.applyTrackState();
+
+    this.vad?.stop();
+    this.attachVad();
+
+    for (const track of oldStream?.getTracks() ?? []) track.stop();
+  }
+
+  setParticipantVolume(userId: string, volume: number): void {
+    this.mixer?.setVolume(userId, volume);
+    const participant = this.participants.get(userId);
+    if (participant) {
+      participant.volume = this.mixer?.getVolume(userId) ?? volume;
+      this.emitParticipants();
+    }
+  }
+
+  /**
+   * Мьют и push-to-talk — это `track.enabled`, а не пересогласование.
+   * Переключение мгновенное и не трогает соединение.
+   */
+  private applyTrackState(): void {
+    const shouldSend = !this.muted && this.transmitting;
+    for (const track of this.localStream?.getAudioTracks() ?? []) {
+      track.enabled = shouldSend;
+    }
+    if (!shouldSend && this.speaking) {
+      this.speaking = false;
+      this.socket.send({ type: "state", speaking: false });
+      this.emitSelf();
+    }
+  }
+
+  private attachVad(): void {
+    if (!this.context || !this.localStream) return;
+
+    const source = this.context.createMediaStreamSource(this.localStream);
+    this.vad = createVad(this.context, source, (speaking) => {
+      // Замьюченный не может «говорить»: иначе у остальных горит кольцо
+      // человека, которого они не слышат.
+      const effective = speaking && !this.muted && this.transmitting;
+      if (effective === this.speaking) return;
+      this.speaking = effective;
+      this.socket.send({ type: "state", speaking: effective });
+      this.emitSelf();
+    });
+  }
+
+  // -------------------------------------------------------------------------
+  // Сигналинг
+  // -------------------------------------------------------------------------
+
+  private handleServerMessage(msg: import("@badyum/shared").ServerMessage): void {
+    switch (msg.type) {
+      case "welcome": {
+        this.selfId = msg.selfId;
+        this.iceServers = msg.iceServers as RTCIceServer[];
+        this.participants.clear();
+
+        // Инициатива за новичком: он создаёт соединения ко всем, кто уже внутри.
+        for (const participant of msg.participants) {
+          this.upsertParticipant(participant);
+          this.createPeer(participant.userId);
+        }
+        this.setQuality({ status: "connected" });
+        this.emitParticipants();
+        return;
+      }
+
+      case "peer_joined": {
+        this.upsertParticipant(msg.participant);
+        // Соединение создаст он сам — иначе получим два offer навстречу.
+        this.emitParticipants();
+        return;
+      }
+
+      case "peer_left": {
+        this.peers.get(msg.userId)?.close();
+        this.peers.delete(msg.userId);
+        this.mixer?.remove(msg.userId);
+        this.participants.delete(msg.userId);
+        this.emitParticipants();
+        return;
+      }
+
+      case "signal": {
+        const peer = this.peers.get(msg.from) ?? this.createPeer(msg.from);
+        void peer.acceptSignal(msg.payload);
+        return;
+      }
+
+      case "peer_state": {
+        const participant = this.participants.get(msg.userId);
+        if (!participant) return;
+        if (msg.muted !== undefined) participant.muted = msg.muted;
+        if (msg.deafened !== undefined) participant.deafened = msg.deafened;
+        if (msg.speaking !== undefined) participant.speaking = msg.speaking;
+        this.emitParticipants();
+        return;
+      }
+
+      case "error": {
+        for (const cb of this.errorSubs) cb({ code: msg.code, message: msg.message });
+        if (msg.code === "bad_token" || msg.code === "channel_not_found") {
+          this.setQuality({ status: "failed" });
+        }
+        return;
+      }
+
+      case "pong":
+        return;
+    }
+  }
+
+  private createPeer(peerId: string): Peer {
+    const existing = this.peers.get(peerId);
+    if (existing) return existing;
+
+    if (!this.selfId || !this.localStream) {
+      throw new Error("createPeer до welcome — этого не должно происходить");
+    }
+
+    const peer = new Peer({
+      selfId: this.selfId,
+      peerId,
+      iceServers: this.iceServers,
+      localStream: this.localStream,
+      callbacks: {
+        sendSignal: (payload: SignalPayload) => {
+          this.socket.send({ type: "signal", to: peerId, payload });
+        },
+        onTrack: (stream) => {
+          this.mixer?.add(peerId, stream);
+          const participant = this.participants.get(peerId);
+          if (participant) {
+            participant.hasStream = true;
+            this.emitParticipants();
+          }
+        },
+        onStateChange: (state) => {
+          if (state === "failed") this.setQuality({ status: "reconnecting" });
+          if (state === "connected" && this.quality.status !== "connected") {
+            this.setQuality({ status: "connected" });
+          }
+        },
+      },
+    });
+
+    this.peers.set(peerId, peer);
+    return peer;
+  }
+
+  private upsertParticipant(participant: Participant): void {
+    this.participants.set(participant.userId, {
+      ...participant,
+      volume: this.mixer?.getVolume(participant.userId) ?? 1,
+      hasStream: this.mixer?.has(participant.userId) ?? false,
+    });
+  }
+
+  /** Худший из peer'ов и есть качество связи — усреднять здесь значит врать. */
+  private async pollStats(): Promise<void> {
+    if (this.peers.size === 0) return;
+
+    let worstRtt: number | null = null;
+    let worstLoss: number | null = null;
+    let relayed = false;
+
+    for (const peer of this.peers.values()) {
+      const stats = await peer.readStats();
+      if (stats.rttMs !== null && (worstRtt === null || stats.rttMs > worstRtt)) {
+        worstRtt = stats.rttMs;
+      }
+      if (stats.packetLoss !== null && (worstLoss === null || stats.packetLoss > worstLoss)) {
+        worstLoss = stats.packetLoss;
+      }
+      if (stats.relayed) relayed = true;
+    }
+
+    this.setQuality({ rttMs: worstRtt, packetLoss: worstLoss, relayed });
+  }
+
+  // -------------------------------------------------------------------------
+  // Подписки
+  // -------------------------------------------------------------------------
+
+  onParticipants(cb: (p: VoiceParticipant[]) => void): Unsub {
+    this.participantsSubs.add(cb);
+    cb([...this.participants.values()]);
+    return () => this.participantsSubs.delete(cb);
+  }
+
+  onSelf(cb: (s: { muted: boolean; deafened: boolean; speaking: boolean }) => void): Unsub {
+    this.selfSubs.add(cb);
+    cb({ muted: this.muted, deafened: this.deafened, speaking: this.speaking });
+    return () => this.selfSubs.delete(cb);
+  }
+
+  onQuality(cb: (q: ConnectionQuality) => void): Unsub {
+    this.qualitySubs.add(cb);
+    cb(this.quality);
+    return () => this.qualitySubs.delete(cb);
+  }
+
+  onError(cb: (e: { code: string; message: string }) => void): Unsub {
+    this.errorSubs.add(cb);
+    return () => this.errorSubs.delete(cb);
+  }
+
+  private emitParticipants(): void {
+    const list = [...this.participants.values()];
+    for (const cb of this.participantsSubs) cb(list);
+  }
+
+  private emitSelf(): void {
+    const self = { muted: this.muted, deafened: this.deafened, speaking: this.speaking };
+    for (const cb of this.selfSubs) cb(self);
+  }
+
+  private setQuality(patch: Partial<ConnectionQuality>): void {
+    this.quality = { ...this.quality, ...patch };
+    for (const cb of this.qualitySubs) cb(this.quality);
+  }
+}

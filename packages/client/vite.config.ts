@@ -1,0 +1,16 @@
+import { defineConfig } from "vite";
+import react from "@vitejs/plugin-react";
+
+export default defineConfig({
+  plugins: [react()],
+  server: {
+    // Слушаем все интерфейсы: телефон проверяется с той же машины по локальному
+    // IP, а не через localhost.
+    host: true,
+    port: 5173,
+    proxy: {
+      "/api": { target: "http://localhost:8787", changeOrigin: true },
+      "/ws": { target: "ws://localhost:8787", ws: true },
+    },
+  },
+});
