@@ -1,13 +1,13 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { MeshEngine } from "./MeshEngine.ts";
-import type { ConnectionQuality, VoiceEngine, VoiceParticipant } from "./VoiceEngine.ts";
+import type {
+  ConnectionQuality,
+  SelfState,
+  VoiceEngine,
+  VoiceParticipant,
+} from "./VoiceEngine.ts";
 import { wsUrl } from "../api.ts";
 
-interface SelfState {
-  muted: boolean;
-  deafened: boolean;
-  speaking: boolean;
-}
 
 /**
  * Единственный мост между React и звуком.
@@ -23,6 +23,7 @@ export function useVoice() {
     muted: false,
     deafened: false,
     speaking: false,
+    transmitting: true,
   });
   const [quality, setQuality] = useState<ConnectionQuality>({
     status: "idle",

@@ -4,6 +4,8 @@ build/
 *.log
 .env
 .env.local
+target/
+gen/schemas/
 .DS_Store
 *.sqlite
 *.sqlite-journal

@@ -325,6 +325,15 @@
   color: var(--text-muted);
 }
 
+.ptt__note {
+  font-family: var(--font-mono);
+  font-size: 9.5px;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  color: var(--text-muted);
+  opacity: 0.75;
+}
+
 .ptt__key {
   padding: 2px 5px;
   border-radius: var(--radius-sm);
@@ -371,6 +380,18 @@
   background: var(--accent-lime);
   border-color: var(--accent-lime);
   filter: brightness(1.08);
+}
+
+/* Рация включена, но клавиша не зажата: микрофон готов и молчит. */
+.ctrl--armed {
+  background: transparent;
+  border-color: var(--accent-lime);
+  color: var(--accent-lime);
+}
+
+.ctrl--armed:hover {
+  background: rgba(195, 245, 60, 0.1);
+  border-color: var(--accent-lime);
 }
 
 .ctrl--danger {

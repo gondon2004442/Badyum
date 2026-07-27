@@ -26,6 +26,18 @@ export interface VoiceParticipant extends Participant {
   hasStream: boolean;
 }
 
+export interface SelfState {
+  muted: boolean;
+  deafened: boolean;
+  speaking: boolean;
+  /**
+   * Идёт ли передача прямо сейчас. Отличается от `muted`: при включённой рации
+   * микрофон не выключен, но и не передаёт, пока клавиша не зажата. Без этого
+   * состояния в интерфейсе человек не понимает, слышат его или нет.
+   */
+  transmitting: boolean;
+}
+
 export interface JoinOptions {
   token: string;
   inputDeviceId?: string;
@@ -53,7 +65,7 @@ export interface VoiceEngine {
   setParticipantVolume(userId: string, volume: number): void;
 
   onParticipants(cb: (participants: VoiceParticipant[]) => void): Unsub;
-  onSelf(cb: (self: { muted: boolean; deafened: boolean; speaking: boolean }) => void): Unsub;
+  onSelf(cb: (self: SelfState) => void): Unsub;
   onQuality(cb: (quality: ConnectionQuality) => void): Unsub;
   onError(cb: (error: { code: string; message: string }) => void): Unsub;
 }
