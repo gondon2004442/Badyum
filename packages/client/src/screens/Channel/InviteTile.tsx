@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import QRCode from "qrcode";
-import { fetchInviteCode } from "../../api.ts";
+import { fetchInviteCode, publicOrigin } from "../../api.ts";
 
 /**
  * Свободное место в канале.
@@ -23,7 +23,7 @@ export function InviteTile({ channelId }: { channelId: string }) {
         if (cancelled) return;
         setCode(inviteCode);
 
-        const url = `${location.origin}/j/${inviteCode}`;
+        const url = `${publicOrigin()}/j/${inviteCode}`;
         const svg = await QRCode.toString(url, {
           type: "svg",
           margin: 0,
@@ -40,12 +40,12 @@ export function InviteTile({ channelId }: { channelId: string }) {
     };
   }, [channelId]);
 
-  const url = code ? `${location.host}/j/${code}` : "";
+  const url = code ? `${publicOrigin().replace(/^https?:\/\//, "")}/j/${code}` : "";
 
   const copy = async () => {
     if (!code) return;
     try {
-      await navigator.clipboard.writeText(`${location.origin}/j/${code}`);
+      await navigator.clipboard.writeText(`${publicOrigin()}/j/${code}`);
       setCopied(true);
       setTimeout(() => setCopied(false), 1600);
     } catch {

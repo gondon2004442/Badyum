@@ -1,5 +1,5 @@
-import { useCallback, useEffect, useState } from "react";
-import { fetchInviteCode } from "../../api.ts";
+import { useEffect, useState } from "react";
+import { fetchInviteCode, publicOrigin } from "../../api.ts";
 import type { ConnectionQuality } from "../../voice/VoiceEngine.ts";
 import { usePushToTalk, useVoice } from "../../voice/useVoice.ts";
 import { Avatar } from "../../components/Avatar.tsx";
@@ -12,6 +12,7 @@ import {
   SpeakerIcon,
 } from "../../components/Icons.tsx";
 import { InviteTile } from "./InviteTile.tsx";
+import { globalPushToTalkKey, isDesktop, onGlobalPushToTalk } from "../../desktop.ts";
 import "./Channel.css";
 
 interface ChannelScreenProps {
@@ -34,6 +35,7 @@ export function ChannelScreen({
   const voice = useVoice();
   const [pttEnabled, setPttEnabled] = useState(false);
   const [joined, setJoined] = useState(false);
+  const [globalKey, setGlobalKey] = useState<string | null>(null);
 
   useEffect(() => {
     void voice.join(token).then(() => setJoined(true));
@@ -41,11 +43,41 @@ export function ChannelScreen({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [token]);
 
-  const onTransmitChange = useCallback(
-    (on: boolean) => voice.setTransmitting(on),
-    [voice],
-  );
-  usePushToTalk(pttEnabled ? PTT_KEY : null, onTransmitChange);
+  // Берём метод движка напрямую: он стабилен между рендерами. Обёртка через
+  // useCallback([voice]) меняла бы личность на каждый рендер, эффект ниже
+  // пересоздавался бы вместе с ней и подписка на хоткей не успевала закрепиться.
+  const onTransmitChange = voice.setTransmitting;
+
+  // В десктопной обёртке рация системная и работает поверх игры; в браузере
+  // остаётся клавиша, но только пока вкладка в фокусе.
+  const desktop = isDesktop();
+  usePushToTalk(pttEnabled && !desktop ? PTT_KEY : null, onTransmitChange);
+
+  useEffect(() => {
+    if (!desktop) return;
+    void globalPushToTalkKey().then(setGlobalKey);
+  }, [desktop]);
+
+  useEffect(() => {
+    if (!desktop || !pttEnabled) return;
+
+    let unlisten: (() => void) | null = null;
+    let cancelled = false;
+
+    onTransmitChange(false);
+    void onGlobalPushToTalk(onTransmitChange).then((off) => {
+      if (cancelled) off();
+      else unlisten = off;
+    });
+
+    return () => {
+      cancelled = true;
+      unlisten?.();
+      // Выключили рацию — микрофон обязан вернуться в обычный режим, иначе
+      // человек молчит и не понимает почему.
+      onTransmitChange(true);
+    };
+  }, [desktop, pttEnabled, onTransmitChange]);
 
   const leave = async () => {
     await voice.leave();
@@ -111,16 +143,34 @@ export function ChannelScreen({
               checked={pttEnabled}
               onChange={(e) => setPttEnabled(e.target.checked)}
             />
-            <span className="ptt__key">CAPS</span>
+            <span className="ptt__key">{globalKey ?? "CAPS"}</span>
             удерживай
           </label>
+          <span className="ptt__note">
+            {desktop ? "работает поверх игры" : "только когда вкладка активна"}
+          </span>
         </div>
 
         <div className="controls__group">
+          {/* При включённой рации микрофон не выключен, но и не передаёт.
+              Без отдельного состояния человек говорит в пустоту и не понимает,
+              почему его не слышат. */}
           <button
-            className={`ctrl ${voice.self.muted ? "" : "ctrl--on"}`}
+            className={`ctrl ${
+              voice.self.muted
+                ? ""
+                : voice.self.transmitting
+                  ? "ctrl--on"
+                  : "ctrl--armed"
+            }`}
             onClick={() => voice.setMuted(!voice.self.muted)}
-            title={voice.self.muted ? "Включить микрофон" : "Выключить микрофон"}
+            title={
+              voice.self.muted
+                ? "Включить микрофон"
+                : voice.self.transmitting
+                  ? "Выключить микрофон"
+                  : `Рация: зажми ${globalKey ?? PTT_KEY}`
+            }
             type="button"
           >
             {voice.self.muted ? <MicOffIcon /> : <MicIcon />}
@@ -252,7 +302,7 @@ function StatusBanner({
 
 async function copyInvite(channelId: string): Promise<void> {
   const { code } = await fetchInviteCode(channelId);
-  await navigator.clipboard.writeText(`${location.origin}/j/${code}`).catch(() => {});
+  await navigator.clipboard.writeText(`${publicOrigin()}/j/${code}`).catch(() => {});
 }
 
 function plural(n: number, one: string, few: string, many: string): string {

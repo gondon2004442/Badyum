@@ -30,8 +30,23 @@ const MESSAGES: Record<string, string> = {
   bad_display_name: "Такое имя не подойдёт",
 };
 
+/**
+ * Адрес сервера.
+ *
+ * В браузере остаётся пустым — запросы идут относительными путями на тот же
+ * хост, откуда пришла страница. В десктопной обёртке страница загружается из
+ * локальных файлов (`tauri://localhost`), относительный путь там ведёт в
+ * никуда, поэтому адрес задаётся при сборке через VITE_BADYUM_SERVER.
+ */
+const SERVER_ORIGIN = (import.meta.env.VITE_BADYUM_SERVER ?? "").replace(/\/+$/, "");
+
+/** Абсолютный адрес для ссылок-приглашений: их отправляют наружу. */
+export function publicOrigin(): string {
+  return SERVER_ORIGIN || location.origin;
+}
+
 async function request<T>(path: string, init?: RequestInit): Promise<T> {
-  const response = await fetch(path, {
+  const response = await fetch(`${SERVER_ORIGIN}${path}`, {
     ...init,
     headers: { "content-type": "application/json", ...init?.headers },
   });
@@ -69,6 +84,9 @@ export function fetchInviteCode(channelId: string): Promise<{ code: string }> {
 }
 
 export function wsUrl(): string {
+  if (SERVER_ORIGIN) {
+    return `${SERVER_ORIGIN.replace(/^http/, "ws")}/ws`;
+  }
   const protocol = location.protocol === "https:" ? "wss:" : "ws:";
   return `${protocol}//${location.host}/ws`;
 }

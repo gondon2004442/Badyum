@@ -2,6 +2,7 @@ import type { Participant, SignalPayload } from "@badyum/shared";
 import type {
   ConnectionQuality,
   JoinOptions,
+  SelfState,
   Unsub,
   VoiceEngine,
   VoiceParticipant,
@@ -50,9 +51,7 @@ export class MeshEngine implements VoiceEngine {
   private statsTimer: number | null = null;
 
   private readonly participantsSubs = new Set<(p: VoiceParticipant[]) => void>();
-  private readonly selfSubs = new Set<
-    (s: { muted: boolean; deafened: boolean; speaking: boolean }) => void
-  >();
+  private readonly selfSubs = new Set<(s: SelfState) => void>();
   private readonly qualitySubs = new Set<(q: ConnectionQuality) => void>();
   private readonly errorSubs = new Set<(e: { code: string; message: string }) => void>();
 
@@ -139,8 +138,10 @@ export class MeshEngine implements VoiceEngine {
   }
 
   setTransmitting(on: boolean): void {
+    if (this.transmitting === on) return;
     this.transmitting = on;
     this.applyTrackState();
+    this.emitSelf();
   }
 
   async setInputDevice(deviceId: string): Promise<void> {
@@ -390,9 +391,9 @@ export class MeshEngine implements VoiceEngine {
     return () => this.participantsSubs.delete(cb);
   }
 
-  onSelf(cb: (s: { muted: boolean; deafened: boolean; speaking: boolean }) => void): Unsub {
+  onSelf(cb: (s: SelfState) => void): Unsub {
     this.selfSubs.add(cb);
-    cb({ muted: this.muted, deafened: this.deafened, speaking: this.speaking });
+    cb(this.selfState());
     return () => this.selfSubs.delete(cb);
   }
 
@@ -412,8 +413,17 @@ export class MeshEngine implements VoiceEngine {
     for (const cb of this.participantsSubs) cb(list);
   }
 
+  private selfState(): SelfState {
+    return {
+      muted: this.muted,
+      deafened: this.deafened,
+      speaking: this.speaking,
+      transmitting: this.transmitting,
+    };
+  }
+
   private emitSelf(): void {
-    const self = { muted: this.muted, deafened: this.deafened, speaking: this.speaking };
+    const self = this.selfState();
     for (const cb of this.selfSubs) cb(self);
   }
 

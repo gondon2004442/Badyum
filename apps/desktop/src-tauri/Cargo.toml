@@ -1,0 +1,32 @@
+[package]
+name = "badyum-desktop"
+version = "0.1.0"
+description = "Badyum — голосовые каналы"
+authors = ["Badyum"]
+license = ""
+repository = ""
+edition = "2021"
+rust-version = "1.77.2"
+
+[lib]
+name = "badyum_lib"
+crate-type = ["staticlib", "cdylib", "rlib"]
+
+[build-dependencies]
+tauri-build = { version = "2.6.3", features = [] }
+
+[dependencies]
+serde_json = "1.0"
+serde = { version = "1.0", features = ["derive"] }
+log = "0.4"
+tauri = { version = "2.11.3", features = [] }
+tauri-plugin-log = "2"
+# Ради этого плагина обёртка и существует: браузер не отдаёт клавишу, когда
+# окно не в фокусе, а рация нужна именно тогда — во время игры.
+tauri-plugin-global-shortcut = "2"
+
+# Доступ к микрофону в webview на Linux приходится включать руками, см. lib.rs.
+# Версия закреплена под ту, что тянет сам wry: иначе получим два несовместимых
+# webkit2gtk в одном бинарнике.
+[target.'cfg(target_os = "linux")'.dependencies]
+webkit2gtk = { version = "=2.0.2", features = ["v2_40"] }

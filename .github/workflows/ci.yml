@@ -34,3 +34,25 @@ jobs:
 
       - name: Сборка клиента
         run: pnpm --filter @badyum/client build
+
+  desktop:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      # Tauri на Linux собирается против системного WebKitGTK — без этих
+      # пакетов падает не код, а линковка.
+      - name: Системные зависимости Tauri
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libwebkit2gtk-4.1-dev build-essential \
+            libxdo-dev libssl-dev libayatana-appindicator3-dev librsvg2-dev
+
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: apps/desktop/src-tauri
+
+      - name: Проверка Rust
+        working-directory: apps/desktop/src-tauri
+        run: cargo check --locked
