@@ -5,7 +5,26 @@
  * игровом сценарии — колонки, механическая клавиатура, кулер — собеседники
  * слышат собственное эхо и стук клавиш.
  */
+/**
+ * Страница открыта там, где браузер в принципе не отдаёт микрофон.
+ *
+ * Микрофон доступен только в защищённом контексте: https или localhost. По
+ * локальному IP (http://192.168.x.x) `navigator.mediaDevices` просто не
+ * существует — это не отказ в правах, разрешать нечего. Отдельный тип нужен,
+ * чтобы не показывать «разреши доступ в настройках»: разрешать негде.
+ */
+export class InsecureContextError extends Error {
+  constructor() {
+    super("микрофон доступен только по https или на localhost");
+    this.name = "InsecureContextError";
+  }
+}
+
 export async function captureMicrophone(deviceId?: string): Promise<MediaStream> {
+  if (!navigator.mediaDevices?.getUserMedia) {
+    throw new InsecureContextError();
+  }
+
   return navigator.mediaDevices.getUserMedia({
     audio: {
       deviceId: deviceId ? { exact: deviceId } : undefined,
