@@ -6,6 +6,7 @@ import { RoomRegistry, type Member } from "./rooms.ts";
 const member = (userId: string, channelId = "ch1"): Member => ({
   channelId,
   userId,
+  identityId: null,
   displayName: userId,
   muted: false,
   deafened: false,

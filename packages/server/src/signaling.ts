@@ -8,6 +8,7 @@ import {
 import { MAX_PARTICIPANTS, iceServersFor } from "./config.ts";
 import type { ChannelStore } from "./channels.ts";
 import type { RoomRegistry } from "./rooms.ts";
+import type { ChatLog } from "./chat.ts";
 import { signResumeToken, verifyJoinToken } from "./tokens.ts";
 
 interface Session {
@@ -28,7 +29,7 @@ const HEARTBEAT_MS = 25_000;
  */
 export function attachSignaling(
   server: Server,
-  deps: { channels: ChannelStore; rooms: RoomRegistry },
+  deps: { channels: ChannelStore; rooms: RoomRegistry; chat: ChatLog },
 ): WebSocketServer {
   const wss = new WebSocketServer({ server, path: "/ws" });
 
@@ -49,6 +50,7 @@ export function attachSignaling(
 
   const toParticipant = (m: Participant): Participant => ({
     userId: m.userId,
+    identityId: m.identityId,
     displayName: m.displayName,
     muted: m.muted,
     deafened: m.deafened,
@@ -60,12 +62,16 @@ export function attachSignaling(
     sessions.delete(session.userId);
 
     const { remaining } = deps.rooms.leave(session.channelId, session.userId);
+    deps.chat.forget(session.userId);
     broadcast(session.channelId, { type: "peer_left", userId: session.userId });
 
     // Эфемерный канал (кодовое слово) живёт ровно пока в нём кто-то есть.
     if (remaining === 0) {
       const channel = deps.channels.getChannel(session.channelId);
-      if (channel?.ephemeral) deps.channels.deleteChannel(channel.id);
+      if (channel?.ephemeral) {
+        deps.channels.deleteChannel(channel.id);
+        deps.chat.clear(channel.id);
+      }
     }
   };
 
@@ -133,6 +139,7 @@ export function attachSignaling(
           const result = deps.rooms.join({
             channelId: claims.channelId,
             userId: claims.userId,
+            identityId: claims.identityId ?? null,
             displayName: claims.displayName,
             muted: false,
             deafened: false,
@@ -178,11 +185,13 @@ export function attachSignaling(
           resumeToken: signResumeToken({
             userId: claims.userId,
             channelId: claims.channelId,
+            identityId: claims.identityId ?? null,
             displayName: claims.displayName,
             inviteCode: null,
           }),
           resumed,
           participants: others.map(toParticipant),
+          history: deps.chat.history(channel.id),
           iceServers: iceServersFor(claims.userId),
         });
 
@@ -198,6 +207,7 @@ export function attachSignaling(
         } else {
           const self: Participant = {
             userId: claims.userId,
+            identityId: claims.identityId ?? null,
             displayName: claims.displayName,
             muted: false,
             deafened: false,
@@ -249,6 +259,28 @@ export function attachSignaling(
             },
             session.userId,
           );
+          return;
+        }
+
+        case "chat_send": {
+          const result = deps.chat.append(
+            session.channelId,
+            { userId: session.userId, displayName: session.displayName },
+            msg.text,
+          );
+          if (!result.ok) {
+            if (result.error === "too_fast") {
+              send(socket, {
+                type: "error",
+                code: "too_fast",
+                message: "слишком часто — подожди пару секунд",
+              });
+            }
+            return;
+          }
+          // Отправителю тоже: так у всех один и тот же порядок сообщений,
+          // а не «своё сразу, чужое потом».
+          broadcast(session.channelId, { type: "chat_message", message: result.message });
           return;
         }
 

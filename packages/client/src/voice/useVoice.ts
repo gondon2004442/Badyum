@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { MeshEngine } from "./MeshEngine.ts";
+import type { ChatMessage } from "@badyum/shared";
 import type {
   ConnectionQuality,
   SelfState,
@@ -21,6 +22,7 @@ export function useVoice() {
   const engineRef = useRef<VoiceEngine | null>(null);
   const [participants, setParticipants] = useState<VoiceParticipant[]>([]);
   const [self, setSelf] = useState<SelfState>({
+    selfId: null,
     muted: false,
     deafened: false,
     speaking: false,
@@ -32,6 +34,7 @@ export function useVoice() {
     packetLoss: null,
     relayed: false,
   });
+  const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [error, setError] = useState<string | null>(null);
 
   const engine = useMemo(() => {
@@ -45,6 +48,7 @@ export function useVoice() {
       engine.onParticipants(setParticipants),
       engine.onSelf(setSelf),
       engine.onQuality(setQuality),
+      engine.onChat(setMessages),
       engine.onError((e) => setError(e.message)),
     ];
     return () => {
@@ -80,12 +84,14 @@ export function useVoice() {
     participants,
     self,
     quality,
+    messages,
     error,
     join,
     leave: useCallback(() => engine.leave(), [engine]),
     setMuted: useCallback((m: boolean) => engine.setMuted(m), [engine]),
     setDeafened: useCallback((d: boolean) => engine.setDeafened(d), [engine]),
     setTransmitting: useCallback((t: boolean) => engine.setTransmitting(t), [engine]),
+    sendChat: useCallback((text: string) => engine.sendChat(text), [engine]),
     setParticipantVolume: useCallback(
       (userId: string, volume: number) => engine.setParticipantVolume(userId, volume),
       [engine],

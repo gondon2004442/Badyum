@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { fetchInviteCode, publicOrigin } from "../../api.ts";
 import type { ConnectionQuality } from "../../voice/VoiceEngine.ts";
 import { usePushToTalk, useVoice } from "../../voice/useVoice.ts";
@@ -12,7 +12,17 @@ import {
   SpeakerIcon,
 } from "../../components/Icons.tsx";
 import { InviteTile } from "./InviteTile.tsx";
+import { Sidebar } from "./Sidebar.tsx";
+import { ChatPanel } from "./ChatPanel.tsx";
+import { PeoplePanel } from "./PeoplePanel.tsx";
 import { globalPushToTalkKey, isDesktop, onGlobalPushToTalk } from "../../desktop.ts";
+import {
+  knownPeople,
+  myIdentityId,
+  recentChannels,
+  rememberPerson,
+  type RecentChannel,
+} from "../../storage.ts";
 import "./Channel.css";
 
 interface ChannelScreenProps {
@@ -21,7 +31,12 @@ interface ChannelScreenProps {
   token: string;
   selfName: string;
   onLeave: () => void;
+  onOpenChannel: (channel: RecentChannel) => void;
+  onNewChannel: () => void;
 }
+
+/** Что показывает правая колонка. На мобиле это же — переключатель вкладок. */
+type Panel = "chat" | "people";
 
 const PTT_KEY = "CapsLock";
 
@@ -31,11 +46,33 @@ export function ChannelScreen({
   token,
   selfName,
   onLeave,
+  onOpenChannel,
+  onNewChannel,
 }: ChannelScreenProps) {
   const voice = useVoice();
   const [pttEnabled, setPttEnabled] = useState(false);
   const [joined, setJoined] = useState(false);
   const [globalKey, setGlobalKey] = useState<string | null>(null);
+  const [panel, setPanel] = useState<Panel>("chat");
+  /** Мобильная раскладка: канал и панели не помещаются рядом. */
+  const [mobileView, setMobileView] = useState<"stage" | "panel">("stage");
+  const [storageTick, setStorageTick] = useState(0);
+  const identity = myIdentityId();
+
+  const recent = useMemo(() => recentChannels(), [storageTick, channelId]);
+  const known = useMemo(() => knownPeople(), [storageTick, voice.participants.length]);
+
+  // Встреченных запоминаем сразу: список «знакомых» строится только здесь,
+  // на сервере никакой связи между сессиями нет.
+  useEffect(() => {
+    for (const participant of voice.participants) {
+      rememberPerson({
+        identityId: participant.identityId,
+        displayName: participant.displayName,
+        channelName,
+      });
+    }
+  }, [voice.participants, channelName]);
 
   useEffect(() => {
     void voice.join(token).then(() => setJoined(true));
@@ -87,7 +124,20 @@ export function ChannelScreen({
   const total = voice.participants.length + 1;
 
   return (
-    <div className="channel">
+    <div className="shell">
+      <Sidebar
+        channelName={channelName}
+        channelId={channelId}
+        selfName={selfName}
+        selfIdentity={identity}
+        participantCount={total}
+        recent={recent}
+        onOpenChannel={onOpenChannel}
+        onNewChannel={onNewChannel}
+        onChanged={() => setStorageTick((t) => t + 1)}
+      />
+
+      <div className={`channel channel--${mobileView}`}>
       <header className="channel__header">
         <div className="channel__identity">
           <SpeakerIcon className="channel__icon" />
@@ -191,8 +241,63 @@ export function ChannelScreen({
           </button>
         </div>
 
-        <div className="controls__right" />
+        <div className="controls__right">
+          {/* На мобиле это переключатель между каналом и панелью: рядом они
+              не помещаются, а прятать чат совсем — терять половину смысла. */}
+          <button
+            className="panel-toggle"
+            onClick={() => setMobileView((v) => (v === "stage" ? "panel" : "stage"))}
+            type="button"
+          >
+            {mobileView === "stage" ? "Чат" : "Канал"}
+          </button>
+        </div>
       </footer>
+      </div>
+
+      <div className={`side side--${mobileView === "panel" ? "open" : "closed"}`}>
+        <div className="side__tabs">
+          <button
+            className={`side__tab ${panel === "chat" ? "side__tab--on" : ""}`}
+            onClick={() => setPanel("chat")}
+            type="button"
+          >
+            Чат
+          </button>
+          <button
+            className={`side__tab ${panel === "people" ? "side__tab--on" : ""}`}
+            onClick={() => setPanel("people")}
+            type="button"
+          >
+            Люди
+          </button>
+          <button
+            className="side__back"
+            onClick={() => setMobileView("stage")}
+            type="button"
+          >
+            К каналу
+          </button>
+        </div>
+
+        {panel === "chat" ? (
+          <ChatPanel
+            messages={voice.messages}
+            selfId={voice.self.selfId}
+            onSend={voice.sendChat}
+          />
+        ) : (
+          <PeoplePanel
+            participants={voice.participants}
+            selfName={selfName}
+            selfIdentity={identity}
+            selfSpeaking={voice.self.speaking}
+            selfMuted={voice.self.muted}
+            known={known}
+            onChanged={() => setStorageTick((t) => t + 1)}
+          />
+        )}
+      </div>
     </div>
   );
 }
