@@ -1,4 +1,4 @@
-import type { Participant } from "@badyum/shared";
+import type { ChatMessage, Participant } from "@badyum/shared";
 
 export type Unsub = () => void;
 
@@ -27,6 +27,8 @@ export interface VoiceParticipant extends Participant {
 }
 
 export interface SelfState {
+  /** Кто мы в этой сессии. Нужен, чтобы отличить свои сообщения от чужих. */
+  selfId: string | null;
   muted: boolean;
   deafened: boolean;
   speaking: boolean;
@@ -63,6 +65,15 @@ export interface VoiceEngine {
   setInputDevice(deviceId: string): Promise<void>;
   /** Локальная громкость конкретного участника, 0..2. */
   setParticipantVolume(userId: string, volume: number): void;
+
+  /**
+   * Текстовый чат канала.
+   *
+   * Живёт здесь, а не в компоненте: сообщения приходят по тому же сокету, что
+   * и состав комнаты, и должны переживать переподключение вместе с ним.
+   */
+  sendChat(text: string): void;
+  onChat(cb: (messages: ChatMessage[]) => void): Unsub;
 
   onParticipants(cb: (participants: VoiceParticipant[]) => void): Unsub;
   onSelf(cb: (self: SelfState) => void): Unsub;

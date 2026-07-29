@@ -1,4 +1,4 @@
-import type { Participant, SignalPayload } from "@badyum/shared";
+import type { ChatMessage, Participant, SignalPayload } from "@badyum/shared";
 import type {
   ConnectionQuality,
   JoinOptions,
@@ -54,6 +54,10 @@ export class MeshEngine implements VoiceEngine {
   private readonly selfSubs = new Set<(s: SelfState) => void>();
   private readonly qualitySubs = new Set<(q: ConnectionQuality) => void>();
   private readonly errorSubs = new Set<(e: { code: string; message: string }) => void>();
+  private readonly chatSubs = new Set<(m: ChatMessage[]) => void>();
+
+  /** Переписка канала. Переживает переподключение вместе с сокетом. */
+  private messages: ChatMessage[] = [];
 
   constructor(wsUrl: string) {
     this.socket = new SignalingSocket(wsUrl);
@@ -97,6 +101,8 @@ export class MeshEngine implements VoiceEngine {
     for (const peer of this.peers.values()) peer.close();
     this.peers.clear();
     this.participants.clear();
+    this.messages = [];
+    this.emitChat();
 
     this.vad?.stop();
     this.vad = null;
@@ -242,8 +248,14 @@ export class MeshEngine implements VoiceEngine {
           }
         }
 
+        // История заменяет локальную целиком: сервер — источник правды и
+        // порядка, иначе после возврата сообщения задваивались бы.
+        this.messages = msg.history;
+        this.emitChat();
+
         this.setQuality({ status: "connected" });
         this.emitParticipants();
+        this.emitSelf();
         return;
       }
 
@@ -305,6 +317,15 @@ export class MeshEngine implements VoiceEngine {
         if (msg.code === "bad_token" || msg.code === "channel_not_found") {
           this.setQuality({ status: "failed" });
         }
+        return;
+      }
+
+      case "chat_message": {
+        // Сервер шлёт сообщение и самому отправителю, поэтому проверяем на
+        // дубль: при переподключении оно могло уже прийти в истории.
+        if (this.messages.some((m) => m.id === msg.message.id)) return;
+        this.messages = [...this.messages, msg.message];
+        this.emitChat();
         return;
       }
 
@@ -403,6 +424,18 @@ export class MeshEngine implements VoiceEngine {
     return () => this.qualitySubs.delete(cb);
   }
 
+  sendChat(text: string): void {
+    const trimmed = text.trim();
+    if (!trimmed) return;
+    this.socket.send({ type: "chat_send", text: trimmed.slice(0, 2000) });
+  }
+
+  onChat(cb: (m: ChatMessage[]) => void): Unsub {
+    this.chatSubs.add(cb);
+    cb(this.messages);
+    return () => this.chatSubs.delete(cb);
+  }
+
   onError(cb: (e: { code: string; message: string }) => void): Unsub {
     this.errorSubs.add(cb);
     return () => this.errorSubs.delete(cb);
@@ -415,11 +448,17 @@ export class MeshEngine implements VoiceEngine {
 
   private selfState(): SelfState {
     return {
+      selfId: this.selfId,
       muted: this.muted,
       deafened: this.deafened,
       speaking: this.speaking,
       transmitting: this.transmitting,
     };
+  }
+
+  private emitChat(): void {
+    const list = this.messages;
+    for (const cb of this.chatSubs) cb(list);
   }
 
   private emitSelf(): void {

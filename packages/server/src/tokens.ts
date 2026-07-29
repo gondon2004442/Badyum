@@ -11,6 +11,8 @@ export interface JoinClaims {
   displayName: string;
   /** Код инвайта, по которому вошли — чтобы засчитать использование. */
   inviteCode: string | null;
+  /** Устойчивая личность, если клиент её прислал. Прав не даёт, см. протокол. */
+  identityId?: string | null;
   exp: number;
   /** Токен переподключения: длинный срок жизни, инвайт уже не засчитывается. */
   resume?: boolean;

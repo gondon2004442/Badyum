@@ -32,8 +32,9 @@ services:
     environment:
       BADYUM_TOKEN_SECRET: ${BADYUM_TOKEN_SECRET:?сгенерируй, например openssl rand -hex 32}
       # Наружу сервер не публикуется: браузер ходит к нему через Caddy на том
-      # же домене, поэтому источником всегда будет сам домен.
-      BADYUM_ORIGINS: https://${BADYUM_DOMAIN},tauri://localhost,http://tauri.localhost
+      # же домене. Список задаётся явно, потому что доменов может быть
+      # несколько, а к ним добавляются источники десктопного приложения.
+      BADYUM_ORIGINS: ${BADYUM_ORIGINS:?перечисли адреса через запятую}
       BADYUM_TURN_HOSTS: ${BADYUM_TURN_HOSTS:-}
       BADYUM_TURN_SECRET: ${BADYUM_TURN_SECRET:-}
       BADYUM_MAX_PARTICIPANTS: ${BADYUM_MAX_PARTICIPANTS:-8}
@@ -51,7 +52,7 @@ services:
       - --fingerprint
       - --use-auth-secret
       - --static-auth-secret=${BADYUM_TURN_SECRET:?сгенерируй, например openssl rand -hex 32}
-      - --realm=${BADYUM_DOMAIN}
+      - --realm=${BADYUM_TURN_REALM:?домен для relay, один, без запятых}
       - --external-ip=${BADYUM_TURN_EXTERNAL_IP:?белый IP этой машины}
       - --min-port=49160
       - --max-port=49200

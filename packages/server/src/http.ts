@@ -1,5 +1,6 @@
 import Fastify, { type FastifyInstance } from "fastify";
 import { z } from "zod";
+import { identityIdSchema } from "@badyum/shared";
 import { ALLOWED_ORIGINS, MAX_PARTICIPANTS, hasTurn } from "./config.ts";
 import type { ChannelStore } from "./channels.ts";
 import type { RoomRegistry } from "./rooms.ts";
@@ -9,6 +10,7 @@ import { signJoinToken } from "./tokens.ts";
 const joinBodySchema = z
   .object({
     displayName: z.string().min(1).max(64),
+    identityId: identityIdSchema.optional(),
     code: z.string().max(200).optional(),
     slug: z.string().max(200).optional(),
     channelId: z.string().max(200).optional(),
@@ -104,6 +106,7 @@ export function buildHttpServer(deps: {
     const token = signJoinToken({
       userId: newUserId(),
       channelId: channel.id,
+      identityId: parsed.data.identityId ?? null,
       displayName,
       inviteCode: parsed.data.code ?? null,
     });

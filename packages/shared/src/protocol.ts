@@ -13,8 +13,23 @@ export const PROTOCOL_VERSION = 1;
 /** Идентификатор участника внутри одной сессии канала. */
 export const userIdSchema = z.string().min(1).max(64);
 
+/**
+ * Устойчивая личность.
+ *
+ * `userId` живёт одну сессию и меняется при каждом входе, поэтому по нему
+ * нельзя узнать человека завтра. Этот идентификатор клиент генерирует сам,
+ * хранит у себя и присылает при входе — на нём держатся «люди, с кем ты уже
+ * говорил».
+ *
+ * Важно: это опознание, а не подтверждение личности. Никаких прав он не даёт —
+ * доступ в канал по-прежнему только по инвайту, — и подделать его так же
+ * просто, как назваться чужим именем. Настоящие аккаунты закроют это отдельно.
+ */
+export const identityIdSchema = z.string().regex(/^[a-z0-9]{16,32}$/);
+
 export const participantSchema = z.object({
   userId: userIdSchema,
+  identityId: identityIdSchema.nullable(),
   displayName: z.string().min(1).max(32),
   /** Микрофон выключен — участника не слышно. */
   muted: z.boolean(),
@@ -51,6 +66,20 @@ export const signalPayloadSchema = z.union([
 ]);
 export type SignalPayload = z.infer<typeof signalPayloadSchema>;
 
+/** Сообщение в канале. */
+export const chatMessageSchema = z.object({
+  id: z.string(),
+  userId: userIdSchema,
+  displayName: z.string().min(1).max(32),
+  text: z.string().min(1).max(2000),
+  /** Unix-время в миллисекундах. */
+  at: z.number(),
+});
+export type ChatMessage = z.infer<typeof chatMessageSchema>;
+
+/** Сколько последних сообщений канал помнит и отдаёт вошедшему. */
+export const CHAT_HISTORY_LIMIT = 100;
+
 // ---------------------------------------------------------------------------
 // Клиент -> сервер
 // ---------------------------------------------------------------------------
@@ -72,6 +101,10 @@ export const clientMessageSchema = z.discriminatedUnion("type", [
     muted: z.boolean().optional(),
     deafened: z.boolean().optional(),
     speaking: z.boolean().optional(),
+  }),
+  z.object({
+    type: z.literal("chat_send"),
+    text: z.string().min(1).max(2000),
   }),
   z.object({ type: z.literal("ping") }),
 ]);
@@ -97,6 +130,8 @@ export const serverMessageSchema = z.discriminatedUnion("type", [
     resumed: z.boolean(),
     /** Снимок комнаты на момент входа, БЕЗ самого вошедшего. */
     participants: z.array(participantSchema),
+    /** Что писали до твоего прихода: пустой чат выглядит сломанным. */
+    history: z.array(chatMessageSchema),
     iceServers: z.array(
       z.object({
         urls: z.union([z.string(), z.array(z.string())]),
@@ -128,6 +163,7 @@ export const serverMessageSchema = z.discriminatedUnion("type", [
     deafened: z.boolean().optional(),
     speaking: z.boolean().optional(),
   }),
+  z.object({ type: z.literal("chat_message"), message: chatMessageSchema }),
   z.object({ type: z.literal("pong") }),
   z.object({
     type: z.literal("error"),
@@ -138,6 +174,7 @@ export const serverMessageSchema = z.discriminatedUnion("type", [
       "bad_message",
       "already_joined",
       "not_joined",
+      "too_fast",
     ]),
     message: z.string(),
   }),

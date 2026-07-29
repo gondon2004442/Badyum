@@ -1,3 +1,5 @@
+import { myIdentityId } from "./storage.ts";
+
 export interface JoinResponse {
   token: string;
   channelId: string;
@@ -75,7 +77,20 @@ export function requestJoin(input: {
 }): Promise<JoinResponse> {
   return request<JoinResponse>("/api/join", {
     method: "POST",
-    body: JSON.stringify(input),
+    // Личность прикладываем всегда: по ней собеседники смогут узнать нас при
+    // следующей встрече. Прав она не даёт, см. протокол.
+    body: JSON.stringify({ ...input, identityId: myIdentityId() }),
+  });
+}
+
+export function createChannel(name: string): Promise<{
+  channelId: string;
+  name: string;
+  inviteCode: string;
+}> {
+  return request("/api/channels", {
+    method: "POST",
+    body: JSON.stringify({ name }),
   });
 }
 

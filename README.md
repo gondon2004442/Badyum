@@ -12,6 +12,8 @@
 - Гостевой вход: чтобы попасть в звонок, нужно только имя.
 - Экран канала: плитки участников, кольцо говорящего, мьют, «оглохнуть»,
   громкость на каждого участника, push-to-talk, индикатор качества связи.
+- Текстовый чат канала рядом с голосом.
+- Сайдбар с каналами, куда ты заходил, и панель людей.
 - Мобильная раскладка с учётом safe-area и крупными зонами нажатия.
 
 ## Быстрый старт
@@ -53,13 +55,17 @@ cloudflared tunnel --url http://localhost:5173
 
 ### 1. Сервер
 
-Понадобится VPS и домен, направленный на него A-записью. Дальше:
+Понадобится VPS и домен, направленный на него A-записью. Проект рассчитан на
+два: **badyum.ru** и **badyum.online** — Caddy получит сертификат на оба, и
+второй остаётся запасным входом, если первый окажется недоступен.
+
+Дальше:
 
 ```bash
 git clone https://github.com/gondon2004442/Badyum.git
 cd Badyum
 cp infra/.env.example infra/.env
-# заполни домен, секреты (openssl rand -hex 32) и белый IP машины
+# домены уже проставлены; заполни секреты (openssl rand -hex 32) и белый IP
 docker compose -f infra/docker-compose.prod.yml --env-file infra/.env up -d --build
 ```
 
@@ -70,8 +76,10 @@ Caddy получит сам — отдельно ничего настраива
 В файрволе VPS открой `80`, `443`, `3478/udp` и диапазон `49160-49200/udp`
 (последние два — для relay).
 
-Проверка: `curl https://твой-домен/api/health` должен вернуть
-`"turnConfigured": true`.
+Проверка: `curl https://badyum.ru/api/health` должен вернуть
+`"turnConfigured": true`. Если там `false` — не заполнены `BADYUM_TURN_SECRET`
+или `BADYUM_TURN_HOSTS`, и звонки между разными сетями будут молча не
+соединяться, хотя локально всё выглядит рабочим.
 
 ### 2. Телефон
 
@@ -86,7 +94,7 @@ Caddy получит сам — отдельно ничего настраива
 
 Собираются автоматически по тегу. Один раз задай адрес сервера: **Settings →
 Secrets and variables → Actions → Variables**, переменная `BADYUM_SERVER_URL`
-со значением `https://твой-домен`. Без неё сборка намеренно падает — иначе
+со значением `https://badyum.ru`. Без неё сборка намеренно падает — иначе
 получился бы установщик, который никуда не подключается.
 
 ```bash
@@ -122,7 +130,7 @@ pnpm --filter @badyum/desktop build   # собрать бинарник и па�
 Сервер должен разрешать источник приложения — добавь его в `BADYUM_ORIGINS`:
 
 ```bash
-export BADYUM_ORIGINS="https://badyum.app,tauri://localhost,http://tauri.localhost"
+export BADYUM_ORIGINS="https://badyum.ru,https://badyum.online,tauri://localhost,http://tauri.localhost"
 ```
 
 Для сборки на Linux нужны системные библиотеки:
@@ -141,7 +149,7 @@ packages/
   client/   React + Vite: движок звука и экраны
 apps/
   desktop/  Tauri-обёртка: окно, глобальная рация, доступ к микрофону
-infra/      coturn
+infra/      Docker-образы, Caddy и coturn
 ```
 
 ### Ключевое решение: `VoiceEngine`

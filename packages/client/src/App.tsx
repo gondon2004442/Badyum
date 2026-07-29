@@ -1,12 +1,16 @@
-import { useState } from "react";
+import { useCallback, useState } from "react";
 import { JoinScreen, type JoinTarget } from "./screens/Join/JoinScreen.tsx";
 import { ChannelScreen } from "./screens/Channel/ChannelScreen.tsx";
+import { createChannel, requestJoin } from "./api.ts";
+import { myName, rememberChannel, type RecentChannel } from "./storage.ts";
 
 interface Session {
   token: string;
   channelId: string;
   channelName: string;
   displayName: string;
+  /** Код инвайта, если знаем: по нему канал попадает в «недавние». */
+  code: string | null;
 }
 
 /**
@@ -29,9 +33,40 @@ export function App() {
   const [target] = useState<JoinTarget | null>(parseTarget);
   const [session, setSession] = useState<Session | null>(null);
 
+  const enter = useCallback((next: Session) => {
+    rememberChannel({
+      channelId: next.channelId,
+      name: next.channelName,
+      code: next.code,
+    });
+    if (next.code) history.replaceState({}, "", `/j/${next.code}`);
+    setSession(next);
+  }, []);
+
+  /** Переход в соседний канал: выход из текущего делает сам ChannelScreen. */
+  const openChannel = useCallback(
+    async (channel: RecentChannel) => {
+      if (!channel.code) return;
+      const displayName = myName() || "гость";
+      const result = await requestJoin({ displayName, code: channel.code });
+      enter({ ...result, displayName, code: channel.code });
+    },
+    [enter],
+  );
+
+  const newChannel = useCallback(async () => {
+    const displayName = myName() || "гость";
+    const created = await createChannel("Новый канал");
+    const result = await requestJoin({ displayName, code: created.inviteCode });
+    enter({ ...result, displayName, code: created.inviteCode });
+  }, [enter]);
+
   if (session) {
     return (
       <ChannelScreen
+        // Пересоздаём экран при смене канала: движок держит соединения и
+        // переписку внутри, и переиспользовать его между каналами нельзя.
+        key={session.channelId}
         channelId={session.channelId}
         channelName={session.channelName}
         token={session.token}
@@ -40,11 +75,22 @@ export function App() {
           setSession(null);
           history.pushState({}, "", "/");
         }}
+        onOpenChannel={(channel) => void openChannel(channel)}
+        onNewChannel={() => void newChannel()}
       />
     );
   }
 
-  if (target) return <JoinScreen target={target} onJoined={setSession} />;
+  if (target) {
+    return (
+      <JoinScreen
+        target={target}
+        onJoined={(result) =>
+          enter({ ...result, code: target.code ?? null })
+        }
+      />
+    );
+  }
 
   return <Landing />;
 }
