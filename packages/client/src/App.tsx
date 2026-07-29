@@ -1,7 +1,8 @@
 import { useCallback, useState } from "react";
 import { JoinScreen, type JoinTarget } from "./screens/Join/JoinScreen.tsx";
 import { ChannelScreen } from "./screens/Channel/ChannelScreen.tsx";
-import { createChannel, requestJoin } from "./api.ts";
+import { HomeScreen } from "./screens/Home/HomeScreen.tsx";
+import { ApiError, createChannel, fetchInviteCode, requestJoin } from "./api.ts";
 import { myName, rememberChannel, type RecentChannel } from "./storage.ts";
 
 interface Session {
@@ -30,8 +31,10 @@ function parseTarget(): JoinTarget | null {
 }
 
 export function App() {
-  const [target] = useState<JoinTarget | null>(parseTarget);
+  const [target, setTarget] = useState<JoinTarget | null>(parseTarget);
   const [session, setSession] = useState<Session | null>(null);
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
   const enter = useCallback((next: Session) => {
     rememberChannel({
@@ -43,23 +46,61 @@ export function App() {
     setSession(next);
   }, []);
 
-  /** Переход в соседний канал: выход из текущего делает сам ChannelScreen. */
-  const openChannel = useCallback(
-    async (channel: RecentChannel) => {
-      if (!channel.code) return;
-      const displayName = myName() || "гость";
-      const result = await requestJoin({ displayName, code: channel.code });
-      enter({ ...result, displayName, code: channel.code });
+  /**
+   * Любой вход в канал. Ошибку показываем словами: «ничего не произошло» после
+   * нажатия выглядит как поломка, а канал мог просто исчезнуть.
+   */
+  const go = useCallback(
+    async (run: () => Promise<Session>) => {
+      setBusy(true);
+      setError(null);
+      try {
+        enter(await run());
+      } catch (err) {
+        setError(err instanceof ApiError ? err.message : "Не получилось войти в канал");
+      } finally {
+        setBusy(false);
+      }
     },
     [enter],
   );
 
-  const newChannel = useCallback(async () => {
-    const displayName = myName() || "гость";
-    const created = await createChannel("Новый канал");
-    const result = await requestJoin({ displayName, code: created.inviteCode });
-    enter({ ...result, displayName, code: created.inviteCode });
-  }, [enter]);
+  /** Переход в соседний канал: выход из текущего делает сам ChannelScreen. */
+  const openChannel = useCallback(
+    (channel: RecentChannel) => {
+      if (!channel.code) return;
+      void go(async () => {
+        const displayName = myName() || "гость";
+        const code = channel.code!;
+        const result = await requestJoin({ displayName, code });
+        return { ...result, displayName, code };
+      });
+    },
+    [go],
+  );
+
+  const newChannel = useCallback(() => {
+    void go(async () => {
+      const displayName = myName() || "гость";
+      const created = await createChannel("Новый канал");
+      const result = await requestJoin({ displayName, code: created.inviteCode });
+      return { ...result, displayName, code: created.inviteCode };
+    });
+  }, [go]);
+
+  const openWord = useCallback(
+    (word: string) => {
+      void go(async () => {
+        const displayName = myName() || "гость";
+        const result = await requestJoin({ displayName, slug: word });
+        // У канала по слову инвайта может не быть — попросим его отдельно,
+        // иначе в «недавних» окажется строка, по которой не вернуться.
+        const invite = await fetchInviteCode(result.channelId).catch(() => null);
+        return { ...result, displayName, code: invite?.code ?? null };
+      });
+    },
+    [go],
+  );
 
   if (session) {
     return (
@@ -73,10 +114,13 @@ export function App() {
         selfName={session.displayName}
         onLeave={() => {
           setSession(null);
+          // Цель из адреса тоже сбрасываем: иначе выход из канала возвращал бы
+          // на экран входа в него же вместо домашнего.
+          setTarget(null);
           history.pushState({}, "", "/");
         }}
-        onOpenChannel={(channel) => void openChannel(channel)}
-        onNewChannel={() => void newChannel()}
+        onOpenChannel={openChannel}
+        onNewChannel={newChannel}
       />
     );
   }
@@ -92,44 +136,13 @@ export function App() {
     );
   }
 
-  return <Landing />;
-}
-
-/** Корень без ссылки: единственное осмысленное действие — назвать комнату словом. */
-function Landing() {
-  const [word, setWord] = useState("");
-
   return (
-    <div className="join">
-      <form
-        className="join__inner"
-        onSubmit={(event) => {
-          event.preventDefault();
-          const slug = word.trim();
-          if (slug) location.assign(`/r/${encodeURIComponent(slug)}`);
-        }}
-      >
-        <div className="join__mark">B</div>
-        <span className="join__kicker">Голосовые каналы без границ</span>
-        <h1 className="join__channel">Badyum</h1>
-
-        <input
-          className="join__field"
-          value={word}
-          onChange={(e) => setWord(e.target.value)}
-          placeholder="кодовое слово, например badyum-катка"
-          maxLength={48}
-          aria-label="Кодовое слово комнаты"
-        />
-        <p className="join__label">
-          Назовите с другом одно и то же слово — окажетесь в одном канале
-        </p>
-
-        <button className="join__cta" type="submit" disabled={!word.trim()}>
-          Создать канал
-        </button>
-        <p className="join__note">Регистрация не нужна — только имя</p>
-      </form>
-    </div>
+    <HomeScreen
+      onOpenChannel={openChannel}
+      onNewChannel={newChannel}
+      onOpenWord={openWord}
+      busy={busy}
+      error={error}
+    />
   );
 }

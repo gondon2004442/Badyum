@@ -15,6 +15,7 @@ import { InviteTile } from "./InviteTile.tsx";
 import { Sidebar } from "./Sidebar.tsx";
 import { ChatPanel } from "./ChatPanel.tsx";
 import { PeoplePanel } from "./PeoplePanel.tsx";
+import { SettingsPanel, savedInputDevice } from "./SettingsPanel.tsx";
 import { globalPushToTalkKey, isDesktop, onGlobalPushToTalk } from "../../desktop.ts";
 import {
   knownPeople,
@@ -38,6 +39,32 @@ interface ChannelScreenProps {
 /** Что показывает правая колонка. На мобиле это же — переключатель вкладок. */
 type Panel = "chat" | "people";
 
+/** Порог, за которым канал и панель перестают помещаться рядом. */
+const NARROW_QUERY = "(max-width: 720px)";
+
+/**
+ * Узкий ли экран.
+ *
+ * Нужен не для вёрстки (её делает CSS), а чтобы понимать, видно ли чат: на
+ * телефоне открытая вкладка «Чат» ещё не значит, что он на экране.
+ */
+function useIsNarrow(): boolean {
+  const [narrow, setNarrow] = useState(
+    () => typeof matchMedia === "function" && matchMedia(NARROW_QUERY).matches,
+  );
+
+  useEffect(() => {
+    if (typeof matchMedia !== "function") return;
+    const query = matchMedia(NARROW_QUERY);
+    const update = () => setNarrow(query.matches);
+    update();
+    query.addEventListener("change", update);
+    return () => query.removeEventListener("change", update);
+  }, []);
+
+  return narrow;
+}
+
 const PTT_KEY = "CapsLock";
 
 export function ChannelScreen({
@@ -56,10 +83,28 @@ export function ChannelScreen({
   const [panel, setPanel] = useState<Panel>("chat");
   /** Мобильная раскладка: канал и панели не помещаются рядом. */
   const [mobileView, setMobileView] = useState<"stage" | "panel">("stage");
+  const isNarrow = useIsNarrow();
   const [storageTick, setStorageTick] = useState(0);
+  const [settingsOpen, setSettingsOpen] = useState(false);
+  /** Сколько сообщений было, когда чат последний раз смотрели. */
+  const [seenCount, setSeenCount] = useState(0);
+  /** Имя может меняться на лету, поэтому живёт в состоянии, а не в пропсе. */
+  const [myName, setMyName] = useState(selfName);
   const identity = myIdentityId();
 
   const recent = useMemo(() => recentChannels(), [storageTick, channelId]);
+
+  /**
+   * Чат виден, только когда открыта его вкладка — и на телефоне ещё и когда
+   * показана панель, а не канал.
+   */
+  const chatVisible = panel === "chat" && (mobileView === "panel" || !isNarrow);
+  const unread = Math.max(0, voice.messages.length - seenCount);
+
+  // Пока чат перед глазами, непрочитанных быть не может.
+  useEffect(() => {
+    if (chatVisible) setSeenCount(voice.messages.length);
+  }, [chatVisible, voice.messages.length]);
   const known = useMemo(() => knownPeople(), [storageTick, voice.participants.length]);
 
   // Встреченных запоминаем сразу: список «знакомых» строится только здесь,
@@ -75,7 +120,7 @@ export function ChannelScreen({
   }, [voice.participants, channelName]);
 
   useEffect(() => {
-    void voice.join(token).then(() => setJoined(true));
+    void voice.join(token, savedInputDevice()).then(() => setJoined(true));
     // Токен одноразовый: повторный join по нему невозможен и не нужен.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [token]);
@@ -128,14 +173,27 @@ export function ChannelScreen({
       <Sidebar
         channelName={channelName}
         channelId={channelId}
-        selfName={selfName}
+        selfName={myName}
         selfIdentity={identity}
         participantCount={total}
         recent={recent}
         onOpenChannel={onOpenChannel}
         onNewChannel={onNewChannel}
         onChanged={() => setStorageTick((t) => t + 1)}
+        onOpenSettings={() => setSettingsOpen(true)}
       />
+
+      {settingsOpen ? (
+        <SettingsPanel
+          selfName={myName}
+          onClose={() => setSettingsOpen(false)}
+          onRename={(name) => {
+            voice.rename(name);
+            setMyName(name);
+          }}
+          onPickDevice={voice.setInputDevice}
+        />
+      ) : null}
 
       <div className={`channel channel--${mobileView}`}>
       <header className="channel__header">
@@ -165,7 +223,7 @@ export function ChannelScreen({
       <main className="stage">
         <Tile
           userId="self"
-          name={`${selfName} (ты)`}
+          name={`${myName} (ты)`}
           speaking={voice.self.speaking}
           muted={voice.self.muted}
           isSelf
@@ -250,6 +308,9 @@ export function ChannelScreen({
             type="button"
           >
             {mobileView === "stage" ? "Чат" : "Канал"}
+            {mobileView === "stage" && unread > 0 ? (
+              <span className="side__badge">{unread > 99 ? "99+" : unread}</span>
+            ) : null}
           </button>
         </div>
       </footer>
@@ -263,6 +324,7 @@ export function ChannelScreen({
             type="button"
           >
             Чат
+            {unread > 0 ? <span className="side__badge">{unread > 99 ? "99+" : unread}</span> : null}
           </button>
           <button
             className={`side__tab ${panel === "people" ? "side__tab--on" : ""}`}
@@ -289,7 +351,7 @@ export function ChannelScreen({
         ) : (
           <PeoplePanel
             participants={voice.participants}
-            selfName={selfName}
+            selfName={myName}
             selfIdentity={identity}
             selfSpeaking={voice.self.speaking}
             selfMuted={voice.self.muted}

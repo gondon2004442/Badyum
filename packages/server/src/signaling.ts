@@ -10,6 +10,7 @@ import type { ChannelStore } from "./channels.ts";
 import type { RoomRegistry } from "./rooms.ts";
 import type { ChatLog } from "./chat.ts";
 import { signResumeToken, verifyJoinToken } from "./tokens.ts";
+import { normalizeDisplayName } from "./ids.ts";
 
 interface Session {
   socket: WebSocket;
@@ -281,6 +282,23 @@ export function attachSignaling(
           // Отправителю тоже: так у всех один и тот же порядок сообщений,
           // а не «своё сразу, чужое потом».
           broadcast(session.channelId, { type: "chat_message", message: result.message });
+          return;
+        }
+
+        case "rename": {
+          const name = normalizeDisplayName(msg.displayName);
+          if (!name || name === session.displayName) return;
+
+          const member = deps.rooms.rename(session.channelId, session.userId, name);
+          if (!member) return;
+
+          // Имя живёт и в сессии: с ним уходят будущие сообщения чата.
+          session.displayName = name;
+          broadcast(session.channelId, {
+            type: "peer_renamed",
+            userId: session.userId,
+            displayName: name,
+          });
           return;
         }
 

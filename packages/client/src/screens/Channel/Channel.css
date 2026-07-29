@@ -1088,11 +1088,181 @@
   }
 
   .panel-toggle {
-    display: block;
+    display: inline-flex;
   }
 
   .controls__right {
     display: flex;
     min-width: 0;
   }
+}
+
+/* --- Настройки --- */
+
+.settings {
+  position: fixed;
+  z-index: 20;
+  left: 50%;
+  top: 50%;
+  transform: translate(-50%, -50%);
+  width: min(400px, calc(100vw - 32px));
+  padding: 18px;
+  border-radius: var(--radius-lg);
+  background: var(--bg-surface);
+  border: 1px solid var(--border-strong);
+}
+
+.settings__head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 18px;
+}
+
+.settings__title {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+}
+
+.settings__close {
+  font-size: 20px;
+  line-height: 1;
+  color: var(--text-muted);
+}
+
+.settings__close:hover {
+  color: var(--text-primary);
+}
+
+.settings__group + .settings__group {
+  margin-top: 18px;
+}
+
+.settings__label {
+  display: block;
+  margin-bottom: 7px;
+  font-family: var(--font-mono);
+  font-size: 9.5px;
+  font-weight: 600;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--text-muted);
+}
+
+.settings__row {
+  display: flex;
+  gap: 8px;
+}
+
+.settings__input,
+.settings__select {
+  flex: 1;
+  min-width: 0;
+  padding: 10px 12px;
+  border-radius: var(--radius-md);
+  background: var(--bg-base);
+  border: 1px solid var(--border-subtle);
+  color: var(--text-primary);
+  font-family: inherit;
+  font-size: 13px;
+  outline: none;
+}
+
+.settings__select {
+  width: 100%;
+}
+
+.settings__input:focus,
+.settings__select:focus {
+  border-color: var(--accent-lime);
+}
+
+.settings__apply {
+  padding: 0 14px;
+  border-radius: var(--radius-md);
+  background: var(--accent-lime);
+  color: var(--bg-base);
+  font-family: var(--font-mono);
+  font-size: 10.5px;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  white-space: nowrap;
+}
+
+.settings__apply:disabled {
+  opacity: 0.35;
+  cursor: not-allowed;
+}
+
+.settings__hint {
+  margin: 7px 0 0;
+  font-size: 11px;
+  color: var(--text-muted);
+}
+
+.settings__note {
+  margin: 16px 0 0;
+  padding: 8px 10px;
+  border-radius: var(--radius-md);
+  background: var(--bg-elevated);
+  font-family: var(--font-mono);
+  font-size: 10px;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  color: var(--accent-mint);
+}
+
+.sidebar__gear {
+  display: grid;
+  place-items: center;
+  width: 28px;
+  height: 28px;
+  border-radius: var(--radius-sm);
+  color: var(--text-muted);
+}
+
+.sidebar__gear:hover {
+  background: var(--bg-hover);
+  color: var(--text-primary);
+}
+
+/* Счётчик непрочитанных: пока чат не на экране, о новых сообщениях иначе
+   никак не узнать. */
+.side__badge {
+  display: inline-grid;
+  place-items: center;
+  min-width: 17px;
+  height: 17px;
+  margin-left: 6px;
+  padding: 0 5px;
+  border-radius: var(--radius-sm);
+  background: var(--accent-lime);
+  color: var(--bg-base);
+  font-family: var(--font-mono);
+  font-size: 9.5px;
+  font-weight: 700;
+  letter-spacing: 0;
+  vertical-align: middle;
+}
+
+.side__tab {
+  display: inline-flex;
+  align-items: center;
+}
+
+/* Только выравнивание: display у кнопки задаётся медиазапросами — она скрыта
+   на десктопе, и перебивать это здесь нельзя. */
+.panel-toggle {
+  align-items: center;
+}
+
+.settings__backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 19;
+  background: rgba(11, 12, 17, 0.6);
 }

@@ -68,10 +68,10 @@ export function useVoice() {
   }, [engine]);
 
   const join = useCallback(
-    async (token: string) => {
+    async (token: string, inputDeviceId?: string) => {
       setError(null);
       try {
-        await engine.join({ token });
+        await engine.join({ token, inputDeviceId });
       } catch (err) {
         setError(describeMicError(err));
         throw err;
@@ -92,6 +92,11 @@ export function useVoice() {
     setDeafened: useCallback((d: boolean) => engine.setDeafened(d), [engine]),
     setTransmitting: useCallback((t: boolean) => engine.setTransmitting(t), [engine]),
     sendChat: useCallback((text: string) => engine.sendChat(text), [engine]),
+    rename: useCallback((name: string) => engine.rename(name), [engine]),
+    setInputDevice: useCallback(
+      (deviceId: string) => engine.setInputDevice(deviceId),
+      [engine],
+    ),
     setParticipantVolume: useCallback(
       (userId: string, volume: number) => engine.setParticipantVolume(userId, volume),
       [engine],

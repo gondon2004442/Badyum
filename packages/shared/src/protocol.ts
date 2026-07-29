@@ -106,6 +106,16 @@ export const clientMessageSchema = z.discriminatedUnion("type", [
     type: z.literal("chat_send"),
     text: z.string().min(1).max(2000),
   }),
+  /**
+   * Сменить имя, не выходя из канала.
+   *
+   * Без этого настройка «как меня зовут» применялась бы только при следующем
+   * входе — то есть выглядела бы сломанной.
+   */
+  z.object({
+    type: z.literal("rename"),
+    displayName: z.string().min(1).max(32),
+  }),
   z.object({ type: z.literal("ping") }),
 ]);
 export type ClientMessage = z.infer<typeof clientMessageSchema>;
@@ -164,6 +174,11 @@ export const serverMessageSchema = z.discriminatedUnion("type", [
     speaking: z.boolean().optional(),
   }),
   z.object({ type: z.literal("chat_message"), message: chatMessageSchema }),
+  z.object({
+    type: z.literal("peer_renamed"),
+    userId: userIdSchema,
+    displayName: z.string().min(1).max(32),
+  }),
   z.object({ type: z.literal("pong") }),
   z.object({
     type: z.literal("error"),
