@@ -76,6 +76,14 @@ export class RoomRegistry {
     return member;
   }
 
+  /** Смена имени на лету. Возвращает нормализованное имя или undefined. */
+  rename(channelId: string, userId: string, displayName: string): Member | undefined {
+    const member = this.rooms.get(channelId)?.get(userId);
+    if (!member) return undefined;
+    member.displayName = displayName;
+    return member;
+  }
+
   members(channelId: string): Member[] {
     const room = this.rooms.get(channelId);
     return room ? [...room.values()] : [];

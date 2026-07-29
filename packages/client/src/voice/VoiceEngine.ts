@@ -75,6 +75,9 @@ export interface VoiceEngine {
   sendChat(text: string): void;
   onChat(cb: (messages: ChatMessage[]) => void): Unsub;
 
+  /** Сменить имя, не выходя из канала. */
+  rename(displayName: string): void;
+
   onParticipants(cb: (participants: VoiceParticipant[]) => void): Unsub;
   onSelf(cb: (self: SelfState) => void): Unsub;
   onQuality(cb: (quality: ConnectionQuality) => void): Unsub;

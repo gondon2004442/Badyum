@@ -320,6 +320,14 @@ export class MeshEngine implements VoiceEngine {
         return;
       }
 
+      case "peer_renamed": {
+        const participant = this.participants.get(msg.userId);
+        if (!participant) return;
+        participant.displayName = msg.displayName;
+        this.emitParticipants();
+        return;
+      }
+
       case "chat_message": {
         // Сервер шлёт сообщение и самому отправителю, поэтому проверяем на
         // дубль: при переподключении оно могло уже прийти в истории.
@@ -422,6 +430,11 @@ export class MeshEngine implements VoiceEngine {
     this.qualitySubs.add(cb);
     cb(this.quality);
     return () => this.qualitySubs.delete(cb);
+  }
+
+  rename(displayName: string): void {
+    const name = displayName.trim().slice(0, 32);
+    if (name) this.socket.send({ type: "rename", displayName: name });
   }
 
   sendChat(text: string): void {

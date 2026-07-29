@@ -3,8 +3,9 @@ import { Avatar } from "../../components/Avatar.tsx";
 import { forgetChannel, type RecentChannel } from "../../storage.ts";
 
 interface SidebarProps {
-  channelName: string;
-  channelId: string;
+  /** null — мы не в канале: сайдбар тот же, активной строки просто нет. */
+  channelName: string | null;
+  channelId: string | null;
   selfName: string;
   selfIdentity: string;
   participantCount: number;
@@ -12,6 +13,7 @@ interface SidebarProps {
   onOpenChannel: (channel: RecentChannel) => void;
   onNewChannel: () => void;
   onChanged: () => void;
+  onOpenSettings: () => void;
 }
 
 /**
@@ -31,6 +33,7 @@ export function Sidebar({
   onOpenChannel,
   onNewChannel,
   onChanged,
+  onOpenSettings,
 }: SidebarProps) {
   const others = recent.filter((c) => c.channelId !== channelId);
 
@@ -45,11 +48,13 @@ export function Sidebar({
         <div className="sidebar__section">
           <span className="sidebar__label">Голосовые каналы</span>
 
-          <div className="chan chan--active">
-            <SpeakerIcon size={16} className="chan__icon" />
-            <span className="chan__name">{channelName}</span>
-            <span className="chan__count">{participantCount}</span>
-          </div>
+          {channelName !== null ? (
+            <div className="chan chan--active">
+              <SpeakerIcon size={16} className="chan__icon" />
+              <span className="chan__name">{channelName}</span>
+              <span className="chan__count">{participantCount}</span>
+            </div>
+          ) : null}
 
           {others.map((channel) => (
             <div key={channel.channelId} className="chan">
@@ -79,7 +84,9 @@ export function Sidebar({
 
           {others.length === 0 ? (
             <p className="sidebar__empty">
-              Другие каналы появятся здесь, когда ты в них зайдёшь
+              {channelName === null
+                ? "Каналы появятся здесь, когда ты в них зайдёшь"
+                : "Другие каналы появятся здесь, когда ты в них зайдёшь"}
             </p>
           ) : null}
 
@@ -96,9 +103,9 @@ export function Sidebar({
           <span className="sidebar__myname">{selfName}</span>
           <span className="sidebar__mytag">#{selfIdentity.slice(0, 4)}</span>
         </div>
-        <span className="sidebar__gear" title="Настройки появятся позже">
+        <button className="sidebar__gear" onClick={onOpenSettings} title="Настройки" type="button">
           <SlidersIcon size={16} />
-        </span>
+        </button>
       </div>
     </aside>
   );
