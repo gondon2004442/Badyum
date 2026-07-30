@@ -65,21 +65,22 @@ cloudflared tunnel --url http://localhost:5173
 git clone https://github.com/gondon2004442/Badyum.git
 cd Badyum
 cp infra/.env.example infra/.env
-# домены уже проставлены; заполни секреты (openssl rand -hex 32) и белый IP
+# домены уже проставлены; заполни секреты (openssl rand -hex 32) и ключи relay
 docker compose -f infra/docker-compose.prod.yml --env-file infra/.env up -d --build
 ```
 
-Поднимутся три контейнера: статика клиента за Caddy, сигналинг и coturn. HTTPS
-Caddy получит сам — отдельно ничего настраивать не нужно, а он здесь
-обязателен: без защищённого соединения браузер не отдаёт микрофон.
+Поднимутся два контейнера: статика клиента за Caddy и сигналинг. HTTPS Caddy
+получит сам — отдельно ничего настраивать не нужно, а он здесь обязателен: без
+защищённого соединения браузер не отдаёт микрофон.
 
-В файрволе VPS открой `80`, `443`, `3478/udp` и диапазон `49160-49200/udp`
-(последние два — для relay).
+В файрволе VPS достаточно открыть `80` и `443`. Relay по умолчанию managed
+(Cloudflare), поэтому UDP-портов и белого IPv4 не требуется — они нужны только
+своему coturn, см. ниже.
 
 Проверка: `curl https://badyum.ru/api/health` должен вернуть
-`"turnConfigured": true`. Если там `false` — не заполнены `BADYUM_TURN_SECRET`
-или `BADYUM_TURN_HOSTS`, и звонки между разными сетями будут молча не
-соединяться, хотя локально всё выглядит рабочим.
+`"turnConfigured": true`. Если там `false` — relay не настроен, и звонки между
+разными сетями будут молча не соединяться, хотя локально всё выглядит рабочим.
+Поле `turn` в том же ответе показывает, какой именно путь живой.
 
 ### 2. Телефон
 
@@ -181,19 +182,55 @@ Mesh и SFU отличаются ровно одним — откуда беру
 сети сидят за symmetric NAT / CGNAT, где прямое P2P не устанавливается никогда.
 Без TURN звонки с телефона работают «через раз» и выглядят как плавающий баг.
 
-```bash
-export BADYUM_TURN_SECRET=$(openssl rand -hex 32)
-export BADYUM_TURN_EXTERNAL_IP=<белый IP машины>
-docker compose -f infra/docker-compose.yml up -d
+Аудио через relay — около 40 кбит/с на поток. Даже вчетвером и полностью через
+relay это ~540 МБ за час разговора, то есть трафик здесь никогда не будет
+узким местом. Узкое место — доступность самого relay.
 
-export BADYUM_TURN_HOSTS=turn:<хост>:3478?transport=udp
+Поддерживаются два пути, и можно включить оба сразу: тогда WebRTC переберёт
+кандидатов сам, и авария у одного из relay останется незаметной.
+
+### Managed relay Cloudflare (по умолчанию)
+
+Бесплатно до 1000 ГБ в месяц, не нужны ни белый IPv4, ни открытый UDP. Плюс
+anycast — relay берётся из ближайшей к человеку точки, а не из одного ДЦ, что
+для «вне зависимости от геолокации» объективно лучше своего одиночного coturn.
+
+Панель Cloudflare → Realtime → TURN → создать ключ, дальше в `infra/.env`:
+
+```bash
+BADYUM_CF_TURN_KEY_ID=<id ключа>
+BADYUM_CF_TURN_API_TOKEN=<токен>
+```
+
+Креды сервер берёт сам и держит в кэше один набор на всех: у Cloudflare они не
+привязаны к пользователю, так что персональные ничего бы не защитили, зато
+стоили бы обращения к чужому API на каждый вход в канал. Срок жизни намеренно с
+запасом — `RTCPeerConnection` запоминает `iceServers` при создании и держит их
+до закрытия, включая ICE restart, поэтому истечение кред посреди разговора
+ломало бы relay молча.
+
+### Свой coturn
+
+Нужен, только если managed-вариант не подходит. Требует выделенного белого IPv4
+и открытых `3478/udp` + `49160-49200/udp`.
+
+```bash
+# в infra/.env
+BADYUM_TURN_SECRET=$(openssl rand -hex 32)
+BADYUM_TURN_EXTERNAL_IP=<белый IP машины>
+BADYUM_TURN_REALM=badyum.ru
+BADYUM_TURN_HOSTS=turn:badyum.ru:3478?transport=udp
+```
+
+```bash
+docker compose -f infra/docker-compose.prod.yml \
+               -f infra/docker-compose.coturn.yml --env-file infra/.env up -d
 ```
 
 Креды выдаются короткоживущие по HMAC-схеме coturn: конфиг клиента виден в
-DevTools, и статический пароль превратил бы relay в чужой прокси. Аудио через
-relay — около 40 кбит/с на поток, так что трафик копеечный.
+DevTools, и статический пароль превратил бы relay в чужой прокси.
 
-`GET /api/health` показывает `turnConfigured` — по нему видно, настроен ли relay.
+`GET /api/health` показывает `turnConfigured` и разбивку по путям в поле `turn`.
 
 ## Проверка
 

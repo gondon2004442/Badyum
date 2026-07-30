@@ -5,7 +5,8 @@ import {
   type Participant,
   type ServerMessage,
 } from "@badyum/shared";
-import { MAX_PARTICIPANTS, iceServersFor } from "./config.ts";
+import { MAX_PARTICIPANTS } from "./config.ts";
+import { iceServersFor } from "./turn.ts";
 import type { ChannelStore } from "./channels.ts";
 import type { RoomRegistry } from "./rooms.ts";
 import type { ChatLog } from "./chat.ts";
