@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { createServer } from "node:http";
 import { describe, it } from "node:test";
-import { CloudflareTurn, normalizeCloudflareServers } from "./turn.ts";
+import { CloudflareTurn, iceServersFor, normalizeCloudflareServers } from "./turn.ts";
 
 const CF_REPLY = {
   iceServers: [
@@ -65,6 +65,28 @@ describe("разбор ответа Cloudflare TURN", () => {
     });
 
     assert.deepEqual(servers, []);
+  });
+});
+
+describe("список для браузера", () => {
+  it("не повторяет один адрес дважды", () => {
+    const urls = iceServersFor("u1").flatMap((s) =>
+      Array.isArray(s.urls) ? s.urls : [s.urls],
+    );
+
+    assert.deepEqual(
+      urls,
+      [...new Set(urls)],
+      `в списке есть дубли: ${urls.join(", ")}`,
+    );
+  });
+
+  it("всегда отдаёт хотя бы STUN, даже когда relay не настроен", () => {
+    const urls = iceServersFor("u1").flatMap((s) =>
+      Array.isArray(s.urls) ? s.urls : [s.urls],
+    );
+
+    assert.ok(urls.some((u) => u.startsWith("stun:")), urls.join(", "));
   });
 });
 

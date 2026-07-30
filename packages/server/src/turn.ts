@@ -257,13 +257,30 @@ function coturnServers(userId: string): IceServer[] {
  * Оба relay складываются в один список, если настроены оба: WebRTC перебирает
  * кандидатов сам, и авария у одного из relay тогда просто не заметна. Именно
  * это и означает «вне зависимости от геолокации» на практике.
+ *
+ * Адреса дедуплицируются: STUN Cloudflare приходит и из наших дефолтов, и из
+ * ответа их API, а дубль в списке — это лишний круг сбора кандидатов на каждом
+ * соединении.
  */
 export function iceServersFor(userId: string): IceServer[] {
-  return [
+  const seen = new Set<string>();
+  const result: IceServer[] = [];
+
+  for (const server of [
     { urls: STUN_URLS },
     ...(cloudflareTurn?.servers() ?? []),
     ...coturnServers(userId),
-  ];
+  ]) {
+    const urls: string[] = [];
+    for (const url of Array.isArray(server.urls) ? server.urls : [server.urls]) {
+      if (seen.has(url)) continue;
+      seen.add(url);
+      urls.push(url);
+    }
+    if (urls.length > 0) result.push({ ...server, urls });
+  }
+
+  return result;
 }
 
 /**
