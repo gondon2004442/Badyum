@@ -5,12 +5,15 @@ import {
   type Participant,
   type ServerMessage,
 } from "@badyum/shared";
-import { MAX_PARTICIPANTS, iceServersFor } from "./config.ts";
-import type { ChannelStore } from "./channels.ts";
-import type { RoomRegistry } from "./rooms.ts";
-import type { ChatLog } from "./chat.ts";
+import { MAX_PARTICIPANTS } from "./config.ts";
+import { iceServersFor } from "./turn.ts";
+import {
+  normalizeDisplayName,
+  type ChannelStore,
+  type ChatLog,
+  type RoomRegistry,
+} from "@badyum/core";
 import { signResumeToken, verifyJoinToken } from "./tokens.ts";
-import { normalizeDisplayName } from "./ids.ts";
 
 interface Session {
   socket: WebSocket;
@@ -142,7 +145,10 @@ export function attachSignaling(
             userId: claims.userId,
             identityId: claims.identityId ?? null,
             displayName: claims.displayName,
-            muted: false,
+            // Вошедший замьючен, пока сам не скажет обратное. Клиент так же
+            // стартует, но остальные не должны ждать его первого `state`:
+            // до него они видели бы у новичка живой микрофон.
+            muted: true,
             deafened: false,
             speaking: false,
           });
@@ -210,7 +216,7 @@ export function attachSignaling(
             userId: claims.userId,
             identityId: claims.identityId ?? null,
             displayName: claims.displayName,
-            muted: false,
+            muted: true,
             deafened: false,
             speaking: false,
           };

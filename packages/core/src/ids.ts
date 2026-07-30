@@ -1,4 +1,21 @@
-import { randomInt, randomUUID } from "node:crypto";
+/**
+ * Случайное целое в [0, max) без смещения.
+ *
+ * Берём глобальный Web Crypto, а не node:crypto: тот же код должен работать в
+ * workerd, где node:crypto нет. Значения, попавшие в неполный последний блок,
+ * отбрасываем — иначе взятие остатка сделало бы первые символы алфавита чаще
+ * остальных, а нам этот алфавит ещё диктовать голосом.
+ */
+function randomBelow(max: number): number {
+  const limit = Math.floor(0x100000000 / max) * max;
+  const buf = new Uint32Array(1);
+  let value: number;
+  do {
+    crypto.getRandomValues(buf);
+    value = buf[0]!;
+  } while (value >= limit);
+  return value % max;
+}
 
 /**
  * Алфавит инвайт-кодов. Из него выброшены символы, которые люди путают при
@@ -14,7 +31,7 @@ export const CODE_LENGTH = 6;
 export function generateInviteCode(length = CODE_LENGTH): string {
   let out = "";
   for (let i = 0; i < length; i += 1) {
-    out += CODE_ALPHABET[randomInt(CODE_ALPHABET.length)];
+    out += CODE_ALPHABET[randomBelow(CODE_ALPHABET.length)];
   }
   return out;
 }
@@ -73,13 +90,13 @@ export function normalizeDisplayName(raw: string): string | null {
 
 /** Тег в паре к нику: dumax#4821. */
 export function generateTag(): string {
-  return String(randomInt(10000)).padStart(4, "0");
+  return String(randomBelow(10000)).padStart(4, "0");
 }
 
 export function newUserId(): string {
-  return randomUUID();
+  return crypto.randomUUID();
 }
 
 export function newChannelId(): string {
-  return `ch_${randomUUID()}`;
+  return `ch_${crypto.randomUUID()}`;
 }

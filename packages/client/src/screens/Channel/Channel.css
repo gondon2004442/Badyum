@@ -285,6 +285,43 @@
   white-space: pre-line;
 }
 
+/* --- Подсказка про выключенный микрофон --- */
+
+/*
+ * Живёт над панелью управления и сама является кнопкой: человек, который
+ * прочитал «нажми, чтобы говорить», должен иметь возможность нажать здесь же,
+ * а не искать нужную иконку в ряду из трёх.
+ */
+.mutehint {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-2);
+  flex-shrink: 0;
+  width: 100%;
+  padding: 10px var(--space-6);
+  background: rgba(255, 176, 32, 0.12);
+  border-top: 1px solid rgba(255, 176, 32, 0.32);
+  color: var(--text-primary);
+  font-size: 12.5px;
+  /* На узком экране надпись переносится — по центру она читается ровно,
+     а прижатая влево вторая строка выглядит обрывком. */
+  text-align: center;
+}
+
+.mutehint:hover {
+  background: rgba(255, 176, 32, 0.2);
+}
+
+.mutehint svg {
+  color: var(--status-warn);
+  flex-shrink: 0;
+}
+
+.mutehint b {
+  font-weight: 600;
+}
+
 /* --- Панель управления --- */
 
 .controls {
@@ -455,6 +492,12 @@
 @media (max-width: 720px) {
   .channel__header {
     padding: 10px var(--space-4);
+  }
+
+  /* Надпись переносится и уезжает от иконки, оставляя её висеть у края.
+     Перечёркнутый микрофон здесь и так виден — на плитке и на кнопке. */
+  .mutehint svg {
+    display: none;
   }
 
   .stage {

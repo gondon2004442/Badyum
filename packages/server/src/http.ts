@@ -1,10 +1,14 @@
 import Fastify, { type FastifyInstance } from "fastify";
 import { z } from "zod";
 import { identityIdSchema } from "@badyum/shared";
-import { ALLOWED_ORIGINS, MAX_PARTICIPANTS, hasTurn } from "./config.ts";
-import type { ChannelStore } from "./channels.ts";
-import type { RoomRegistry } from "./rooms.ts";
-import { newUserId, normalizeDisplayName } from "./ids.ts";
+import { ALLOWED_ORIGINS, MAX_PARTICIPANTS } from "./config.ts";
+import { turnStatus } from "./turn.ts";
+import {
+  newUserId,
+  normalizeDisplayName,
+  type ChannelStore,
+  type RoomRegistry,
+} from "@badyum/core";
 import { signJoinToken } from "./tokens.ts";
 
 const joinBodySchema = z
@@ -42,13 +46,18 @@ export function buildHttpServer(deps: {
 
   app.options("/*", async (_req, reply) => reply.code(204).send());
 
-  app.get("/api/health", async () => ({
-    ok: true,
-    // Явно отдаём наружу: без TURN мобильные сети за CGNAT не соединятся,
-    // и это должно быть видно на здоровье сервиса, а не всплывать у юзеров.
-    turnConfigured: hasTurn,
-    maxParticipants: MAX_PARTICIPANTS,
-  }));
+  app.get("/api/health", async () => {
+    // Считаем на каждый запрос, а не один раз на старте: managed relay может
+    // перестать выдавать креды на ходу, и это обязано быть видно здесь, а не
+    // всплывать у пользователей как «иногда не соединяется».
+    const turn = turnStatus();
+    return {
+      ok: true,
+      turnConfigured: turn.configured,
+      turn,
+      maxParticipants: MAX_PARTICIPANTS,
+    };
+  });
 
   /**
    * Предпросмотр канала до входа: кто уже внутри и как называется.

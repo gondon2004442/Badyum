@@ -35,36 +35,16 @@ services:
       # же домене. Список задаётся явно, потому что доменов может быть
       # несколько, а к ним добавляются источники десктопного приложения.
       BADYUM_ORIGINS: ${BADYUM_ORIGINS:?перечисли адреса через запятую}
+      # Managed relay Cloudflare — путь по умолчанию: не нужен ни белый IP, ни
+      # открытый UDP, ни своя машина под coturn.
+      BADYUM_CF_TURN_KEY_ID: ${BADYUM_CF_TURN_KEY_ID:-}
+      BADYUM_CF_TURN_API_TOKEN: ${BADYUM_CF_TURN_API_TOKEN:-}
+      # Свой coturn, если поднят надстройкой docker-compose.coturn.yml.
       BADYUM_TURN_HOSTS: ${BADYUM_TURN_HOSTS:-}
       BADYUM_TURN_SECRET: ${BADYUM_TURN_SECRET:-}
       BADYUM_MAX_PARTICIPANTS: ${BADYUM_MAX_PARTICIPANTS:-8}
     expose:
       - "8787"
-
-  # Без relay мобильные операторы за CGNAT не соединятся никогда. Это не
-  # опциональный компонент, а условие работы «вне геолокации».
-  coturn:
-    image: coturn/coturn:4.6
-    network_mode: host
-    restart: unless-stopped
-    command:
-      - --listening-port=3478
-      - --fingerprint
-      - --use-auth-secret
-      - --static-auth-secret=${BADYUM_TURN_SECRET:?сгенерируй, например openssl rand -hex 32}
-      - --realm=${BADYUM_TURN_REALM:?домен для relay, один, без запятых}
-      - --external-ip=${BADYUM_TURN_EXTERNAL_IP:?белый IP этой машины}
-      - --min-port=49160
-      - --max-port=49200
-      - --no-tls
-      - --no-dtls
-      - --no-multicast-peers
-      # Не даём использовать relay как проход во внутреннюю сеть.
-      - --denied-peer-ip=10.0.0.0-10.255.255.255
-      - --denied-peer-ip=172.16.0.0-172.31.255.255
-      - --denied-peer-ip=192.168.0.0-192.168.255.255
-      - --denied-peer-ip=169.254.0.0-169.254.255.255
-      - --log-file=stdout
 
 volumes:
   caddy-data:

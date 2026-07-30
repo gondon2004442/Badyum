@@ -1,4 +1,3 @@
-import { randomUUID } from "node:crypto";
 import { CHAT_HISTORY_LIMIT, type ChatMessage } from "@badyum/shared";
 
 /** Не чаще стольких сообщений за окно — иначе один человек забивает канал. */
@@ -44,7 +43,7 @@ export class ChatLog {
     if (!this.allow(sender.userId)) return { ok: false, error: "too_fast" };
 
     const message: ChatMessage = {
-      id: randomUUID(),
+      id: crypto.randomUUID(),
       userId: sender.userId,
       displayName: sender.displayName,
       text,
