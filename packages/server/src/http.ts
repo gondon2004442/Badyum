@@ -3,9 +3,12 @@ import { z } from "zod";
 import { identityIdSchema } from "@badyum/shared";
 import { ALLOWED_ORIGINS, MAX_PARTICIPANTS } from "./config.ts";
 import { turnStatus } from "./turn.ts";
-import type { ChannelStore } from "./channels.ts";
-import type { RoomRegistry } from "./rooms.ts";
-import { newUserId, normalizeDisplayName } from "./ids.ts";
+import {
+  newUserId,
+  normalizeDisplayName,
+  type ChannelStore,
+  type RoomRegistry,
+} from "@badyum/core";
 import { signJoinToken } from "./tokens.ts";
 
 const joinBodySchema = z

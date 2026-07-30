@@ -7,11 +7,13 @@ import {
 } from "@badyum/shared";
 import { MAX_PARTICIPANTS } from "./config.ts";
 import { iceServersFor } from "./turn.ts";
-import type { ChannelStore } from "./channels.ts";
-import type { RoomRegistry } from "./rooms.ts";
-import type { ChatLog } from "./chat.ts";
+import {
+  normalizeDisplayName,
+  type ChannelStore,
+  type ChatLog,
+  type RoomRegistry,
+} from "@badyum/core";
 import { signResumeToken, verifyJoinToken } from "./tokens.ts";
-import { normalizeDisplayName } from "./ids.ts";
 
 interface Session {
   socket: WebSocket;

@@ -1,8 +1,6 @@
 import { HOST, MAX_PARTICIPANTS, PORT } from "./config.ts";
 import { primeTurn, turnStatus } from "./turn.ts";
-import { ChannelStore } from "./channels.ts";
-import { RoomRegistry } from "./rooms.ts";
-import { ChatLog } from "./chat.ts";
+import { ChannelStore, ChatLog, RoomRegistry } from "@badyum/core";
 import { buildHttpServer } from "./http.ts";
 import { attachSignaling } from "./signaling.ts";
 
