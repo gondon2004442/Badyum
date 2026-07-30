@@ -41,18 +41,75 @@ export type ResolveError =
 const DEFAULT_INVITE_TTL_MS = 7 * 24 * 60 * 60 * 1000;
 
 /**
- * Хранилище каналов в памяти.
+ * Куда записывать изменения, чтобы они пережили перезапуск.
+ *
+ * Методы синхронные намеренно. Единственный, кто это реализует, — Durable
+ * Object, а он единственный писатель своего хранилища и сам упорядочивает
+ * записи; ждать их здесь незачем. Если бы интерфейс был асинхронным, `resolve`
+ * и `createChannel` пришлось бы сделать async, а вместе с ними — весь путь
+ * входа в канал, где await посреди обработки открывает гонки.
+ */
+export interface ChannelSink {
+  saveChannel(channel: Channel): void;
+  removeChannel(id: string): void;
+  saveInvite(invite: Invite): void;
+  removeInvite(code: string): void;
+}
+
+/** Полное состояние хранилища — то, что восстанавливают при старте. */
+export interface ChannelSnapshot {
+  channels: Channel[];
+  invites: Invite[];
+}
+
+/**
+ * Хранилище каналов.
  *
  * Все четыре способа связи (ссылка, QR, кодовое слово, канал по id) сходятся
  * в `resolve` и дальше идут одним и тем же путём входа. Это сознательно: любой
  * новый способ добавляется здесь и больше нигде.
  *
- * Переезд на SQLite — замена этого класса, интерфейс остаётся тот же.
+ * Состояние живёт в памяти и работает без `sink` — так его использует обычный
+ * сервер. С `sink` каждое изменение дополнительно уходит в долговременное
+ * хранилище, а `hydrate` возвращает его обратно при старте. Логика при этом
+ * одна и та же: она слишком тонкая (сроки жизни инвайтов, лимиты использований,
+ * создание канала по свободному слову), чтобы существовать в двух версиях.
  */
 export class ChannelStore {
   private readonly channels = new Map<string, Channel>();
   private readonly invites = new Map<string, Invite>();
   private readonly bySlug = new Map<string, string>();
+  private readonly sink: ChannelSink | null;
+
+  constructor(sink: ChannelSink | null = null) {
+    this.sink = sink;
+  }
+
+  /**
+   * Восстановление состояния. Заменяет содержимое целиком, а не дополняет:
+   * применить снимок к непустому хранилищу — это почти всегда ошибка порядка
+   * инициализации, и тихое слияние спрятало бы её.
+   */
+  hydrate(snapshot: ChannelSnapshot): void {
+    this.channels.clear();
+    this.invites.clear();
+    this.bySlug.clear();
+
+    for (const channel of snapshot.channels) {
+      this.channels.set(channel.id, channel);
+      if (channel.slug) this.bySlug.set(channel.slug, channel.id);
+    }
+    for (const invite of snapshot.invites) {
+      this.invites.set(invite.code, invite);
+    }
+  }
+
+  snapshot(): ChannelSnapshot {
+    return {
+      channels: [...this.channels.values()],
+      invites: [...this.invites.values()],
+    };
+  }
 
   createChannel(opts: { name: string; slug?: string | null; ephemeral?: boolean }): Channel {
     const channel: Channel = {
@@ -64,6 +121,7 @@ export class ChannelStore {
     };
     this.channels.set(channel.id, channel);
     if (channel.slug) this.bySlug.set(channel.slug, channel.id);
+    this.sink?.saveChannel(channel);
     return channel;
   }
 
@@ -77,8 +135,11 @@ export class ChannelStore {
     if (channel.slug) this.bySlug.delete(channel.slug);
     this.channels.delete(id);
     for (const [code, invite] of this.invites) {
-      if (invite.channelId === id) this.invites.delete(code);
+      if (invite.channelId !== id) continue;
+      this.invites.delete(code);
+      this.sink?.removeInvite(code);
     }
+    this.sink?.removeChannel(id);
   }
 
   createInvite(
@@ -99,6 +160,7 @@ export class ChannelStore {
       uses: 0,
     };
     this.invites.set(code, invite);
+    this.sink?.saveInvite(invite);
     return invite;
   }
 
@@ -177,6 +239,8 @@ export class ChannelStore {
    */
   consumeInvite(code: string): void {
     const invite = this.invites.get(code);
-    if (invite) invite.uses += 1;
+    if (!invite) return;
+    invite.uses += 1;
+    this.sink?.saveInvite(invite);
   }
 }
