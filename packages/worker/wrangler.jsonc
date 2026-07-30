@@ -1,0 +1,8 @@
+{
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "badyum",
+  "main": "src/index.ts",
+  "compatibility_date": "2026-07-01",
+  // nodejs_compat не нужен: ядро специально написано на Web Crypto.
+  "observability": { "enabled": true }
+}

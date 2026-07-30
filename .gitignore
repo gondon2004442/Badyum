@@ -12,3 +12,6 @@ gen/schemas/
 data/
 coverage/
 .vite/
+
+# Локальное состояние wrangler (Durable Objects, кэш workerd)
+.wrangler/
