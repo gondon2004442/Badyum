@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
-import { ChannelStore } from "./channels.ts";
+import { ChannelStore, type Channel, type Invite } from "./channels.ts";
 import { CODE_ALPHABET, generateInviteCode, normalizeInviteCode, normalizeSlug } from "./ids.ts";
 
 describe("инвайт-коды", () => {
@@ -113,5 +113,107 @@ describe("резолвер каналов", () => {
     const reused = store.resolve({ slug: "тест-слово" }, { createMissingSlug: true });
     assert.ok(reused.ok);
     assert.notEqual(reused.value.channel.id, channel.id);
+  });
+});
+
+/** Запоминает вызовы sink, чтобы проверять, что именно уходит в хранилище. */
+function recordingSink() {
+  const channels = new Map<string, Channel>();
+  const invites = new Map<string, Invite>();
+  return {
+    channels,
+    invites,
+    sink: {
+      saveChannel: (c: Channel) => void channels.set(c.id, { ...c }),
+      removeChannel: (id: string) => void channels.delete(id),
+      saveInvite: (i: Invite) => void invites.set(i.code, { ...i }),
+      removeInvite: (code: string) => void invites.delete(code),
+    },
+  };
+}
+
+describe("сохранение состояния", () => {
+  it("без sink работает как раньше", () => {
+    const store = new ChannelStore();
+    const channel = store.createChannel({ name: "тест" });
+    assert.equal(store.getChannel(channel.id)?.name, "тест");
+  });
+
+  it("создание канала и инвайта уходит в хранилище", () => {
+    const rec = recordingSink();
+    const store = new ChannelStore(rec.sink);
+
+    const channel = store.createChannel({ name: "катка" });
+    const invite = store.createInvite(channel.id);
+
+    assert.equal(rec.channels.get(channel.id)?.name, "катка");
+    assert.equal(rec.invites.get(invite.code)?.channelId, channel.id);
+  });
+
+  it("использование инвайта пересохраняется, иначе лимит обнулялся бы при перезапуске", () => {
+    const rec = recordingSink();
+    const store = new ChannelStore(rec.sink);
+    const channel = store.createChannel({ name: "катка" });
+    const invite = store.createInvite(channel.id, { maxUses: 2 });
+
+    store.consumeInvite(invite.code);
+
+    assert.equal(rec.invites.get(invite.code)?.uses, 1);
+  });
+
+  it("удаление канала вычищает из хранилища и его, и его инвайты", () => {
+    const rec = recordingSink();
+    const store = new ChannelStore(rec.sink);
+    const channel = store.createChannel({ name: "эфемерный", ephemeral: true });
+    const invite = store.createInvite(channel.id);
+
+    store.deleteChannel(channel.id);
+
+    assert.equal(rec.channels.size, 0);
+    assert.equal(rec.invites.size, 0, `остался инвайт ${invite.code}`);
+  });
+
+  it("после восстановления ссылка продолжает работать", () => {
+    const first = new ChannelStore();
+    const channel = first.createChannel({ name: "катка" });
+    const invite = first.createInvite(channel.id, { maxUses: 5 });
+    first.consumeInvite(invite.code);
+
+    const second = new ChannelStore();
+    second.hydrate(first.snapshot());
+
+    const resolved = second.resolve({ code: invite.code });
+    assert.ok(resolved.ok, "ссылка перестала работать после восстановления");
+    assert.equal(resolved.value.channel.id, channel.id);
+    // Счётчик использований тоже должен уцелеть, иначе лимит ничего не значит.
+    assert.equal(second.getInvite(invite.code)?.uses, 1);
+  });
+
+  /**
+   * Индекс по кодовому слову не хранится, а выводится из каналов. Если его не
+   * пересобрать, канал по слову после перезапуска окажется «свободным», и двое
+   * с одним словом попадут в разные каналы, не понимая почему.
+   */
+  it("после восстановления кодовое слово ведёт в тот же канал", () => {
+    const first = new ChannelStore();
+    const created = first.resolve({ slug: "катка" }, { createMissingSlug: true });
+    assert.ok(created.ok);
+
+    const second = new ChannelStore();
+    second.hydrate(first.snapshot());
+
+    const again = second.resolve({ slug: "катка" }, { createMissingSlug: true });
+    assert.ok(again.ok);
+    assert.equal(again.value.channel.id, created.value.channel.id);
+    assert.equal(again.value.source, "slug");
+  });
+
+  it("восстановление заменяет содержимое, а не дополняет его", () => {
+    const store = new ChannelStore();
+    const stale = store.createChannel({ name: "старый" });
+
+    store.hydrate({ channels: [], invites: [] });
+
+    assert.equal(store.getChannel(stale.id), undefined);
   });
 });
