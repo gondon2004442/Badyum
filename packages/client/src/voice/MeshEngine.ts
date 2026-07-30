@@ -35,7 +35,15 @@ export class MeshEngine implements VoiceEngine {
   private readonly peers = new Map<string, Peer>();
   private readonly participants = new Map<string, VoiceParticipant>();
 
-  private muted = false;
+  /**
+   * Входим замьюченными.
+   *
+   * Иначе первые секунды в канале человек вещает, не зная об этом: остальные
+   * слышат его комнату, клавиатуру и разговор, который к ним не относился.
+   * Обратная опасность — «меня не слышат, всё сломалось» — снимается тем, что
+   * выключенный микрофон явно виден в UI, а не только по отсутствию звука.
+   */
+  private muted = true;
   private deafened = false;
   private speaking = false;
   /** Push-to-talk: false означает «сейчас не передаём», но мьют не выставлен. */
@@ -69,6 +77,9 @@ export class MeshEngine implements VoiceEngine {
     // Микрофон берём до сигналинга: отказ в правах должен быть виден сразу,
     // а не после того, как мы уже показались остальным в канале.
     this.localStream = await captureMicrophone(inputDeviceId);
+    // Глушим дорожку сразу, не дожидаясь первого setMuted: между захватом
+    // микрофона и подключением проходят сотни миллисекунд живого звука.
+    this.applyTrackState();
 
     this.context = createAudioContext();
     await this.context.resume();

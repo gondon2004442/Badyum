@@ -90,6 +90,12 @@ export function ChannelScreen({
   const [seenCount, setSeenCount] = useState(0);
   /** Имя может меняться на лету, поэтому живёт в состоянии, а не в пропсе. */
   const [myName, setMyName] = useState(selfName);
+  /**
+   * Включал ли человек микрофон хоть раз за этот вход. Пока нет — держим
+   * подсказку: вход замьюченным экономит чужие уши, но без объяснения читается
+   * как «меня не слышат, всё сломалось».
+   */
+  const [everUnmuted, setEverUnmuted] = useState(false);
   const identity = myIdentityId();
 
   const recent = useMemo(() => recentChannels(), [storageTick, channelId]);
@@ -242,6 +248,22 @@ export function ChannelScreen({
         <InviteTile channelId={channelId} />
       </main>
 
+      {joined && voice.self.muted && !everUnmuted ? (
+        <button
+          className="mutehint"
+          onClick={() => {
+            setEverUnmuted(true);
+            voice.setMuted(false);
+          }}
+          type="button"
+        >
+          <MicOffIcon size={14} />
+          <span>
+            Микрофон выключен — <b>нажми, чтобы говорить</b>
+          </span>
+        </button>
+      ) : null}
+
       <footer className="controls">
         <div className="ptt">
           <span className="ptt__label">Рация</span>
@@ -271,7 +293,10 @@ export function ChannelScreen({
                   ? "ctrl--on"
                   : "ctrl--armed"
             }`}
-            onClick={() => voice.setMuted(!voice.self.muted)}
+            onClick={() => {
+              if (voice.self.muted) setEverUnmuted(true);
+              voice.setMuted(!voice.self.muted);
+            }}
             title={
               voice.self.muted
                 ? "Включить микрофон"
