@@ -3,25 +3,47 @@
   "name": "badyum",
   "main": "src/index.ts",
   "compatibility_date": "2026-07-01",
+  // nodejs_compat не нужен: ядро написано на Web Crypto. Если где-то всплывёт
+  // node:*, это должно упасть, а не тихо заработать на полифилле.
+  "observability": { "enabled": true },
 
   // Порт задан явно. По умолчанию wrangler занимает 8787 — тот же, на котором
   // слушает сигналинг-сервер, и при одновременном запуске побеждал бы тот, кто
   // успел первым. Проигравший падал молча, а приложение оставалось без /ws.
   "dev": { "port": 8788 },
 
-  // nodejs_compat не нужен: ядро специально написано на Web Crypto. Если где-то
-  // всплывёт node:*, это должно упасть, а не тихо заработать на полифилле.
-  "observability": { "enabled": true },
+  /**
+   * Статика клиента отдаётся тем же Worker'ом, а не отдельным проектом Pages:
+   * один домен на страницу, API и WebSocket — значит нет CORS и нет второго
+   * адреса, который надо где-то прописывать.
+   *
+   * single-page-application возвращает index.html на неизвестный путь. Без
+   * этого человек по ссылке-приглашению получал бы 404.
+   */
+  "assets": {
+    "directory": "../client/dist",
+    "binding": "ASSETS",
+    "not_found_handling": "single-page-application",
+    // Запросы к /api и /ws обязаны дойти до кода, а не быть перехвачены
+    // статикой раньше него.
+    "run_worker_first": ["/api/*", "/ws"]
+  },
 
   "durable_objects": {
     "bindings": [
-      // Каталог каналов и инвайтов. Экземпляр один на весь сервис: коды
-      // инвайтов и кодовые слова обязаны быть уникальными глобально.
-      { "name": "REGISTRY", "class_name": "Registry" }
+      // Каталог каналов и инвайтов: коды и кодовые слова уникальны глобально.
+      { "name": "REGISTRY", "class_name": "Registry" },
+      // Комнаты: по объекту на канал, он же держит сокеты участников.
+      { "name": "ROOMS", "class_name": "ChannelRoom" }
     ]
   },
 
   "migrations": [
-    { "tag": "v1", "new_sqlite_classes": ["Registry"] }
-  ]
+    { "tag": "v1", "new_sqlite_classes": ["Registry"] },
+    { "tag": "v2", "new_sqlite_classes": ["ChannelRoom"] }
+  ],
+
+  "vars": {
+    "BADYUM_MAX_PARTICIPANTS": "8"
+  }
 }

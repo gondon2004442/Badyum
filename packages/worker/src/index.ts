@@ -1,22 +1,22 @@
 import { z } from "zod";
 import { identityIdSchema } from "@badyum/shared";
-import { normalizeDisplayName } from "@badyum/core";
+import { newUserId, normalizeDisplayName, TokenSigner } from "@badyum/core";
 import { Registry } from "./Registry.ts";
+import { ChannelRoom } from "./ChannelRoom.ts";
+import type { Env } from "./env.ts";
 
-export { Registry };
-
-export interface Env {
-  REGISTRY: DurableObjectNamespace<Registry>;
-}
+export { Registry, ChannelRoom };
 
 /**
  * Каталог один на весь сервис, поэтому и имя у него одно фиксированное. Будь
  * имён несколько, инвайт-код перестал бы быть уникальным, и двое по одной
  * ссылке могли бы попасть в разные каналы.
  */
-const REGISTRY_NAME = "global";
+const registryOf = (env: Env) => env.REGISTRY.get(env.REGISTRY.idFromName("global"));
 
-const registryOf = (env: Env) => env.REGISTRY.get(env.REGISTRY.idFromName(REGISTRY_NAME));
+/** Комната именуется channelId — объект сам знает, какой канал обслуживает. */
+const roomOf = (env: Env, channelId: string) =>
+  env.ROOMS.get(env.ROOMS.idFromName(channelId));
 
 const createChannelSchema = z.object({
   name: z.string().min(1).max(64),
@@ -36,21 +36,38 @@ const joinBodySchema = z
   });
 
 const json = (body: unknown, status = 200) =>
-  Response.json(body, {
-    status,
-    // CORS не нужен: страница и Worker живут на одном домене, а разрешать
-    // лишнее — только расширять поверхность.
-    headers: { "cache-control": "no-store" },
-  });
+  Response.json(body, { status, headers: { "cache-control": "no-store" } });
 
 export default {
   async fetch(request: Request, env: Env): Promise<Response> {
     const url = new URL(request.url);
     const path = url.pathname;
 
+    /**
+     * Сигналинг. Соединение уходит в объект канала целиком — Worker его не
+     * держит и в разговоре не участвует.
+     *
+     * Канал берём из токена, а не из адреса: иначе можно было бы предъявить
+     * токен от своего канала, а подключиться к чужому. Сам объект тоже сверяет
+     * channelId в токене со своим именем — проверка стоит копейки, а без неё
+     * ошибка здесь молча открывала бы чужую комнату.
+     */
+    if (path === "/ws") {
+      const token = url.searchParams.get("token");
+      if (!token) return new Response("нужен token", { status: 400 });
+
+      const claims = await new TokenSigner(env.BADYUM_TOKEN_SECRET).verify(token);
+      if (!claims) return new Response("токен недействителен", { status: 401 });
+
+      return roomOf(env, claims.channelId).fetch(request);
+    }
+
     if (path === "/api/health") {
       const catalog = await registryOf(env).counts();
-      return json({ ok: true, runtime: "workerd", catalog });
+      const turnConfigured = Boolean(
+        env.BADYUM_CF_TURN_KEY_ID && env.BADYUM_CF_TURN_API_TOKEN,
+      );
+      return json({ ok: true, runtime: "workerd", turnConfigured, catalog });
     }
 
     if (path === "/api/channels" && request.method === "POST") {
@@ -68,10 +85,8 @@ export default {
     }
 
     /**
-     * Предпросмотр канала до входа. Без него экран приглашения — пустая форма
+     * Предпросмотр канала до входа: без него экран приглашения — пустая форма
      * без контекста, а это выглядит как фишинг.
-     *
-     * Список участников пока пустой: они живут в ChannelRoom, которого ещё нет.
      */
     if (path === "/api/preview") {
       const code = url.searchParams.get("code") ?? undefined;
@@ -107,9 +122,8 @@ export default {
     }
 
     /**
-     * Вход. Токен пока не выдаём: он подписывается асинхронным WebCrypto и
-     * появится вместе с ChannelRoom. Но разрешение канала уже работает, и
-     * проверяемо именно здесь — включая создание канала по свободному слову.
+     * Гостевой вход: только имя, никакой регистрации. Барьер «зарегистрируйся,
+     * чтобы поговорить» убивает такие проекты на старте.
      */
     if (path === "/api/join" && request.method === "POST") {
       const parsed = joinBodySchema.safeParse(await request.json().catch(() => null));
@@ -121,13 +135,22 @@ export default {
       const resolved = await registryOf(env).resolve(parsed.data, { createMissingSlug: true });
       if (!resolved.ok) return json({ error: resolved.error }, 404);
 
-      return json({
-        channelId: resolved.value.channel.id,
-        channelName: resolved.value.channel.name,
-        source: resolved.value.source,
+      const channel = resolved.value.channel;
+      const token = await new TokenSigner(env.BADYUM_TOKEN_SECRET).signJoinToken({
+        userId: newUserId(),
+        channelId: channel.id,
+        identityId: parsed.data.identityId ?? null,
+        displayName,
+        inviteCode: parsed.data.code ?? null,
       });
+
+      return json({ token, channelId: channel.id, channelName: channel.name });
     }
 
-    return json({ error: "not_found" }, 404);
+    if (path.startsWith("/api/")) return json({ error: "not_found" }, 404);
+
+    // Всё остальное — статика клиента. Ссылки-приглашения это пути (/j/x7k2mq),
+    // файла по такому пути нет, и SPA-fallback настроен в wrangler.jsonc.
+    return env.ASSETS.fetch(request);
   },
 };

@@ -15,3 +15,6 @@ coverage/
 
 # Локальное состояние wrangler (Durable Objects, кэш workerd)
 .wrangler/
+
+# Секреты локального Worker
+.dev.vars

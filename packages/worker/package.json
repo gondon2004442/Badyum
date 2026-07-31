@@ -4,8 +4,8 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "dev:worker": "wrangler dev",
-    "deploy": "wrangler deploy",
+    "dev:worker": "pnpm --filter @badyum/client build && wrangler dev",
+    "deploy": "pnpm --filter @badyum/client build && wrangler deploy",
     "typecheck": "tsc --noEmit",
     "build": "tsc --noEmit"
   },

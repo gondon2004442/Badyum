@@ -1,0 +1,15 @@
+# Скопируй в packages/worker/.dev.vars и заполни.
+#
+#   cp packages/worker/.dev.vars.example packages/worker/.dev.vars
+#
+# wrangler читает секреты отсюда, а не из переменных окружения оболочки:
+# экспортированный BADYUM_TOKEN_SECRET до Worker'а не доедет.
+
+# Подпись токенов входа. Любая длинная случайная строка:
+#   openssl rand -hex 32
+BADYUM_TOKEN_SECRET=
+
+# Managed relay Cloudflare. Панель → Realtime → TURN → создать ключ.
+# Без него соединения из мобильных сетей за CGNAT не устанавливаются.
+BADYUM_CF_TURN_KEY_ID=
+BADYUM_CF_TURN_API_TOKEN=
