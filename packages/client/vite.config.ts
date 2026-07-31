@@ -25,6 +25,19 @@ const EXTRA_HOSTS = (process.env.BADYUM_DEV_HOSTS ?? "")
   .map((host) => host.trim())
   .filter(Boolean);
 
+const ALLOWED_HOSTS = [
+  ...TUNNEL_HOSTS,
+  ".badyum.ru",
+  ".badyum.online",
+  ...EXTRA_HOSTS,
+];
+
+/** Сигналинг и API всегда на соседнем порту — путь один и для dev, и для preview. */
+const PROXY = {
+  "/api": { target: "http://localhost:8787", changeOrigin: true },
+  "/ws": { target: "ws://localhost:8787", ws: true },
+};
+
 export default defineConfig({
   plugins: [react()],
   server: {
@@ -45,11 +58,23 @@ export default defineConfig({
      * попавший в список, его добавляют переменной BADYUM_DEV_HOSTS — менять
      * конфиг ради этого не нужно.
      */
-    allowedHosts: [...TUNNEL_HOSTS, ".badyum.ru", ".badyum.online", ...EXTRA_HOSTS],
+    allowedHosts: ALLOWED_HOSTS,
     port: 5173,
-    proxy: {
-      "/api": { target: "http://localhost:8787", changeOrigin: true },
-      "/ws": { target: "ws://localhost:8787", ws: true },
-    },
+    proxy: PROXY,
+  },
+
+  /**
+   * Собранная версия — то, что показывают людям через туннель.
+   *
+   * Дев-сервер отдаёт каждый модуль исходников отдельным запросом; их сотни, и
+   * через туннель страница либо ползёт, либо не догружается вовсе — выглядит
+   * это как пустой экран с вечно крутящейся вкладкой. Собранный билд — это
+   * один бандл, и он проходит туннель нормально.
+   */
+  preview: {
+    host: true,
+    allowedHosts: ALLOWED_HOSTS,
+    port: 4173,
+    proxy: PROXY,
   },
 });
