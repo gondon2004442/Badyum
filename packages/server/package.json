@@ -8,7 +8,8 @@
     "start": "node --experimental-strip-types src/index.ts",
     "build": "tsc --noEmit",
     "typecheck": "tsc --noEmit",
-    "test": "node --test --experimental-strip-types \"src/**/*.test.ts\""
+    "test": "node --test --experimental-strip-types \"src/**/*.test.ts\"",
+    "serve": "node --experimental-strip-types src/index.ts"
   },
   "dependencies": {
     "@badyum/core": "workspace:*",
