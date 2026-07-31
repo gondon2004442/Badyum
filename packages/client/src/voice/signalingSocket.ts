@@ -39,7 +39,22 @@ export class SignalingSocket {
   private open(): void {
     if (this.socket) return;
 
-    const socket = new WebSocket(this.url);
+    /**
+     * Токен уходит и в адресе, и следом сообщением `join`.
+     *
+     * В адресе он нужен потому, что серверу надо выбрать комнату до того, как
+     * придёт первое сообщение: соединение сразу отдаётся объекту канала целиком
+     * и после апгрейда его уже не перенаправить. Сообщением — потому что именно
+     * оно несёт вход, и обычный сервер знает только его.
+     *
+     * Токен живёт две минуты и не даёт прав сверх входа в конкретный канал, так
+     * что попадание в логи прокси его не превращает в ключ от чего-либо.
+     */
+    const url = this.pendingToken
+      ? `${this.url}${this.url.includes("?") ? "&" : "?"}token=${encodeURIComponent(this.pendingToken)}`
+      : this.url;
+
+    const socket = new WebSocket(url);
     this.socket = socket;
 
     socket.onopen = () => {
