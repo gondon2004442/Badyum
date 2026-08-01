@@ -372,6 +372,8 @@ export function ChannelScreen({
             messages={voice.messages}
             selfId={voice.self.selfId}
             onSend={voice.sendChat}
+            typing={voice.typing}
+            onTyping={voice.setTyping}
           />
         ) : (
           <PeoplePanel

@@ -54,6 +54,12 @@ export interface JoinOptions {
  *
  * Правило: ни один React-компонент не импортирует RTCPeerConnection напрямую.
  */
+/** Кто сейчас набирает сообщение. */
+export interface TypingPeer {
+  userId: string;
+  displayName: string;
+}
+
 export interface VoiceEngine {
   join(options: JoinOptions): Promise<void>;
   leave(): Promise<void>;
@@ -74,6 +80,10 @@ export interface VoiceEngine {
    */
   sendChat(text: string): void;
   onChat(cb: (messages: ChatMessage[]) => void): Unsub;
+
+  /** «Печатает…»: флаг, а не событие на нажатие — см. протокол. */
+  setTyping(typing: boolean): void;
+  onTyping(cb: (who: TypingPeer[]) => void): Unsub;
 
   /** Сменить имя, не выходя из канала. */
   rename(displayName: string): void;

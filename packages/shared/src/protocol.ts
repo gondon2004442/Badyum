@@ -116,9 +116,34 @@ export const clientMessageSchema = z.discriminatedUnion("type", [
     type: z.literal("rename"),
     displayName: z.string().min(1).max(32),
   }),
+  /**
+   * «Печатает…».
+   *
+   * Флаг, а не событие на каждое нажатие: клиент шлёт `true` не чаще раза в
+   * несколько секунд, пока набирает, и один `false`, когда закончил. Событие на
+   * символ утопило бы канал — на бесплатном плане Cloudflare каждое сообщение
+   * WebSocket считается запросом, и один разговорчивый человек съедал бы
+   * суточный лимит.
+   */
+  z.object({
+    type: z.literal("typing"),
+    typing: z.boolean(),
+  }),
   z.object({ type: z.literal("ping") }),
 ]);
 export type ClientMessage = z.infer<typeof clientMessageSchema>;
+
+/**
+ * Сколько «печатает…» живёт без подтверждения.
+ *
+ * Клиент повторяет флаг чаще этого срока, поэтому надпись не мигает. Но если
+ * человек закрыл вкладку на полуслове, `false` не придёт никогда — и без срока
+ * годности надпись висела бы вечно.
+ */
+export const TYPING_TTL_MS = 6000;
+
+/** Как часто клиент повторяет «печатает…», пока человек набирает. */
+export const TYPING_REFRESH_MS = 3000;
 
 // ---------------------------------------------------------------------------
 // Сервер -> клиент
@@ -174,6 +199,12 @@ export const serverMessageSchema = z.discriminatedUnion("type", [
     speaking: z.boolean().optional(),
   }),
   z.object({ type: z.literal("chat_message"), message: chatMessageSchema }),
+  z.object({
+    type: z.literal("peer_typing"),
+    userId: userIdSchema,
+    displayName: z.string(),
+    typing: z.boolean(),
+  }),
   z.object({
     type: z.literal("peer_renamed"),
     userId: userIdSchema,

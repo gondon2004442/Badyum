@@ -1,11 +1,28 @@
 import { useEffect, useLayoutEffect, useRef, useState, type FormEvent } from "react";
 import type { ChatMessage } from "@badyum/shared";
 import { Avatar } from "../../components/Avatar.tsx";
+import type { TypingPeer } from "../../voice/VoiceEngine.ts";
 
 interface ChatPanelProps {
   messages: ChatMessage[];
   selfId: string | null;
   onSend: (text: string) => void;
+  typing: TypingPeer[];
+  onTyping: (typing: boolean) => void;
+}
+
+/**
+ * «Макс печатает…», «Макс и Коля печатают…», «Печатают трое».
+ *
+ * Имена перечисляем только пока их мало: строка живёт в одну строку под чатом,
+ * и список из пяти имён её распирает.
+ */
+function typingLabel(who: TypingPeer[]): string | null {
+  const names = who.map((w) => w.displayName);
+  if (names.length === 0) return null;
+  if (names.length === 1) return `${names[0]} печатает…`;
+  if (names.length === 2) return `${names[0]} и ${names[1]} печатают…`;
+  return `Печатают ${names.length}`;
 }
 
 /** Сообщения одного человека подряд — одной группой, без повтора имени. */
@@ -31,7 +48,7 @@ function groupsOf(messages: ChatMessage[]): ChatMessage[][] {
 const time = (at: number) =>
   new Date(at).toLocaleTimeString("ru", { hour: "2-digit", minute: "2-digit" });
 
-export function ChatPanel({ messages, selfId, onSend }: ChatPanelProps) {
+export function ChatPanel({ messages, selfId, onSend, typing, onTyping }: ChatPanelProps) {
   const [text, setText] = useState("");
   const listRef = useRef<HTMLDivElement>(null);
   const pinnedRef = useRef(true);
@@ -61,10 +78,23 @@ export function ChatPanel({ messages, selfId, onSend }: ChatPanelProps) {
     if (!value) return;
     onSend(value);
     setText("");
+    // Отправил — значит допечатал. Иначе надпись у остальных висела бы ещё
+    // несколько секунд после того, как сообщение уже пришло.
+    onTyping(false);
     pinnedRef.current = true;
   };
 
+  /**
+   * Пустое поле — это «перестал печатать», а не «печатает пустоту». Человек,
+   * стерший всё написанное, передумал, и остальным это видно сразу.
+   */
+  const onInput = (value: string) => {
+    setText(value);
+    onTyping(value.trim().length > 0);
+  };
+
   const groups = groupsOf(messages);
+  const label = typingLabel(typing);
 
   return (
     <section className="chat">
@@ -103,11 +133,13 @@ export function ChatPanel({ messages, selfId, onSend }: ChatPanelProps) {
         )}
       </div>
 
+      {label ? <div className="chat__typing">{label}</div> : null}
+
       <form className="chat__compose" onSubmit={submit}>
         <input
           className="chat__input"
           value={text}
-          onChange={(e) => setText(e.target.value)}
+          onChange={(e) => onInput(e.target.value)}
           placeholder="Написать в канал"
           maxLength={2000}
           aria-label="Сообщение в канал"
