@@ -74,14 +74,25 @@ export default {
       const parsed = createChannelSchema.safeParse(await request.json().catch(() => null));
       if (!parsed.success) return json({ error: "bad_input" }, 400);
 
+      // CF-Connecting-IP ставит сам Cloudflare и подделать его клиент не может.
+      // Пустая строка — общее ведро: лучше один общий лимит, чем ни одного.
+      const caller = request.headers.get("cf-connecting-ip") ?? "";
+
       const registry = registryOf(env);
-      const channel = await registry.createChannel({
+      const created = await registry.createChannelFor(caller, {
         name: parsed.data.name,
         slug: parsed.data.slug ?? null,
       });
-      const invite = await registry.createInvite(channel.id);
+      if (!created.ok) {
+        return json({ error: "too_many", message: "слишком много каналов, подожди" }, 429);
+      }
+      const invite = await registry.createInvite(created.channel.id);
 
-      return json({ channelId: channel.id, name: channel.name, inviteCode: invite.code });
+      return json({
+        channelId: created.channel.id,
+        name: created.channel.name,
+        inviteCode: invite.code,
+      });
     }
 
     /**

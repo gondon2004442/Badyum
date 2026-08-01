@@ -1,4 +1,5 @@
 import { CHAT_HISTORY_LIMIT, type ChatMessage } from "@badyum/shared";
+import { RateLimiter } from "./rate.ts";
 
 /** Не чаще стольких сообщений за окно — иначе один человек забивает канал. */
 const RATE_LIMIT = 8;
@@ -21,8 +22,7 @@ interface Sender {
  */
 export class ChatLog {
   private readonly byChannel = new Map<string, ChatMessage[]>();
-  /** userId -> времена последних сообщений, для ограничения частоты. */
-  private readonly recent = new Map<string, number[]>();
+  private readonly limiter = new RateLimiter(RATE_LIMIT, RATE_WINDOW_MS);
 
   /**
    * Восстановление истории канала.
@@ -54,7 +54,7 @@ export class ChatLog {
       .slice(0, 2000);
 
     if (!text) return { ok: false, error: "empty" };
-    if (!this.allow(sender.userId)) return { ok: false, error: "too_fast" };
+    if (!this.limiter.allow(sender.userId)) return { ok: false, error: "too_fast" };
 
     const message: ChatMessage = {
       id: crypto.randomUUID(),
@@ -83,22 +83,6 @@ export class ChatLog {
   }
 
   forget(userId: string): void {
-    this.recent.delete(userId);
-  }
-
-  private allow(userId: string): boolean {
-    const now = Date.now();
-    const times = (this.recent.get(userId) ?? []).filter(
-      (t) => now - t < RATE_WINDOW_MS,
-    );
-
-    if (times.length >= RATE_LIMIT) {
-      this.recent.set(userId, times);
-      return false;
-    }
-
-    times.push(now);
-    this.recent.set(userId, times);
-    return true;
+    this.limiter.forget(userId);
   }
 }
