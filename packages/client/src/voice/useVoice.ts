@@ -4,6 +4,7 @@ import type { ChatMessage } from "@badyum/shared";
 import type {
   ConnectionQuality,
   SelfState,
+  TypingPeer,
   VoiceEngine,
   VoiceParticipant,
 } from "./VoiceEngine.ts";
@@ -35,6 +36,7 @@ export function useVoice() {
     relayed: false,
   });
   const [messages, setMessages] = useState<ChatMessage[]>([]);
+  const [typing, setTyping] = useState<TypingPeer[]>([]);
   const [error, setError] = useState<string | null>(null);
 
   const engine = useMemo(() => {
@@ -49,6 +51,7 @@ export function useVoice() {
       engine.onSelf(setSelf),
       engine.onQuality(setQuality),
       engine.onChat(setMessages),
+      engine.onTyping(setTyping),
       engine.onError((e) => setError(e.message)),
     ];
     return () => {
@@ -85,6 +88,7 @@ export function useVoice() {
     self,
     quality,
     messages,
+    typing,
     error,
     join,
     leave: useCallback(() => engine.leave(), [engine]),
@@ -92,6 +96,7 @@ export function useVoice() {
     setDeafened: useCallback((d: boolean) => engine.setDeafened(d), [engine]),
     setTransmitting: useCallback((t: boolean) => engine.setTransmitting(t), [engine]),
     sendChat: useCallback((text: string) => engine.sendChat(text), [engine]),
+    setTyping: useCallback((on: boolean) => engine.setTyping(on), [engine]),
     rename: useCallback((name: string) => engine.rename(name), [engine]),
     setInputDevice: useCallback(
       (deviceId: string) => engine.setInputDevice(deviceId),

@@ -1,9 +1,16 @@
-import type { ChatMessage, Participant, SignalPayload } from "@badyum/shared";
+import {
+  TYPING_REFRESH_MS,
+  TYPING_TTL_MS,
+  type ChatMessage,
+  type Participant,
+  type SignalPayload,
+} from "@badyum/shared";
 import type {
   ConnectionQuality,
   JoinOptions,
   SelfState,
   Unsub,
+  TypingPeer,
   VoiceEngine,
   VoiceParticipant,
 } from "./VoiceEngine.ts";
@@ -63,6 +70,15 @@ export class MeshEngine implements VoiceEngine {
   private readonly qualitySubs = new Set<(q: ConnectionQuality) => void>();
   private readonly errorSubs = new Set<(e: { code: string; message: string }) => void>();
   private readonly chatSubs = new Set<(m: ChatMessage[]) => void>();
+  private readonly typingSubs = new Set<(who: TypingPeer[]) => void>();
+
+  /** Кто сейчас печатает. Таймер снимает надпись, если подтверждение не пришло. */
+  private readonly typing = new Map<
+    string,
+    { displayName: string; timer: number }
+  >();
+  /** Когда мы в последний раз сообщили о своём наборе — для троттлинга. */
+  private typingSentAt = 0;
 
   /** Переписка канала. Переживает переподключение вместе с сокетом. */
   private messages: ChatMessage[] = [];
@@ -342,9 +358,17 @@ export class MeshEngine implements VoiceEngine {
       case "chat_message": {
         // Сервер шлёт сообщение и самому отправителю, поэтому проверяем на
         // дубль: при переподключении оно могло уже прийти в истории.
+        // Отправил — значит допечатал: надпись снимаем, не дожидаясь `false`.
+        this.dropTyping(msg.message.userId);
         if (this.messages.some((m) => m.id === msg.message.id)) return;
         this.messages = [...this.messages, msg.message];
         this.emitChat();
+        return;
+      }
+
+      case "peer_typing": {
+        if (msg.typing) this.markTyping(msg.userId, msg.displayName);
+        else this.dropTyping(msg.userId);
         return;
       }
 
@@ -446,6 +470,67 @@ export class MeshEngine implements VoiceEngine {
   rename(displayName: string): void {
     const name = displayName.trim().slice(0, 32);
     if (name) this.socket.send({ type: "rename", displayName: name });
+  }
+
+  /**
+   * Сообщить, что человек набирает текст.
+   *
+   * Флаг повторяется не чаще TYPING_REFRESH_MS, а `false` уходит сразу. Слать
+   * на каждое нажатие нельзя: на бесплатном плане Cloudflare каждое сообщение
+   * WebSocket считается запросом, и один разговорчивый человек съел бы суточный
+   * лимит на всех.
+   */
+  setTyping(typing: boolean): void {
+    if (!typing) {
+      if (this.typingSentAt === 0) return;
+      this.typingSentAt = 0;
+      this.socket.send({ type: "typing", typing: false });
+      return;
+    }
+
+    const now = Date.now();
+    if (now - this.typingSentAt < TYPING_REFRESH_MS) return;
+    this.typingSentAt = now;
+    this.socket.send({ type: "typing", typing: true });
+  }
+
+  onTyping(cb: (who: TypingPeer[]) => void): Unsub {
+    this.typingSubs.add(cb);
+    cb(this.typingList());
+    return () => this.typingSubs.delete(cb);
+  }
+
+  private markTyping(userId: string, displayName: string): void {
+    const existing = this.typing.get(userId);
+    if (existing) clearTimeout(existing.timer);
+
+    this.typing.set(userId, {
+      displayName,
+      // Срок годности: если человек закрыл вкладку на полуслове, `false` не
+      // придёт никогда, и без таймера надпись висела бы вечно.
+      timer: window.setTimeout(() => this.dropTyping(userId), TYPING_TTL_MS),
+    });
+    this.emitTyping();
+  }
+
+  private dropTyping(userId: string): void {
+    const existing = this.typing.get(userId);
+    if (!existing) return;
+    clearTimeout(existing.timer);
+    this.typing.delete(userId);
+    this.emitTyping();
+  }
+
+  private typingList(): TypingPeer[] {
+    return [...this.typing.entries()].map(([userId, v]) => ({
+      userId,
+      displayName: v.displayName,
+    }));
+  }
+
+  private emitTyping(): void {
+    const list = this.typingList();
+    for (const cb of this.typingSubs) cb(list);
   }
 
   sendChat(text: string): void {

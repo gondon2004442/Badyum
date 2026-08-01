@@ -252,6 +252,19 @@ export class ChannelRoom extends DurableObject<Env> {
         );
       }
 
+      case "typing": {
+        // Отправителю не шлём: себе «печатает…» не показывают.
+        return this.broadcast(
+          {
+            type: "peer_typing",
+            userId: who.userId,
+            displayName: who.displayName,
+            typing: msg.typing,
+          },
+          who.userId,
+        );
+      }
+
       case "chat_send": {
         const result = this.chat.append(
           this.channelId(),
