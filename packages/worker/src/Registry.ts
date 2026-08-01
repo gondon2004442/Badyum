@@ -1,6 +1,7 @@
 import { DurableObject } from "cloudflare:workers";
 import {
   ChannelStore,
+  RateLimiter,
   type Channel,
   type ChannelSink,
   type Invite,
@@ -8,6 +9,16 @@ import {
 
 const CHANNEL_PREFIX = "ch:";
 const INVITE_PREFIX = "inv:";
+
+/**
+ * Сколько каналов можно создать с одного адреса за час.
+ *
+ * Живой человек нажимает «Новый канал» несколько раз за вечер, так что двадцать
+ * — это с запасом. Ограничение нужно не против него, а против цикла в консоли:
+ * ручка публичная, а каждый канал занимает место в хранилище каталога навсегда.
+ */
+const CHANNELS_PER_HOUR = 20;
+const HOUR_MS = 60 * 60 * 1000;
 
 /**
  * Каталог каналов и инвайтов, переживающий перезапуск.
@@ -23,6 +34,12 @@ const INVITE_PREFIX = "inv:";
  */
 export class Registry extends DurableObject {
   private readonly store: ChannelStore;
+  /**
+   * Счётчик держится в памяти и не переживает засыпание объекта. Это осознанно:
+   * хранить его — значит писать в хранилище на каждое нажатие кнопки, а цена
+   * промаха здесь всего лишь ещё двадцать каналов у настойчивого скрипта.
+   */
+  private readonly creations = new RateLimiter(CHANNELS_PER_HOUR, HOUR_MS);
 
   constructor(ctx: DurableObjectState, env: unknown) {
     super(ctx, env as never);
@@ -62,6 +79,21 @@ export class Registry extends DurableObject {
 
   createChannel(opts: { name: string; slug?: string | null; ephemeral?: boolean }): Channel {
     return this.store.createChannel(opts);
+  }
+
+  /**
+   * Создание канала по запросу извне — с ограничением частоты.
+   *
+   * Отдельный метод, а не флаг у createChannel: канал по свободному кодовому
+   * слову создаётся внутри resolve, и туда лимит по адресу не относится — там
+   * человек не «плодит каналы», а входит в тот, о котором договорились.
+   */
+  createChannelFor(
+    caller: string,
+    opts: { name: string; slug?: string | null },
+  ): { ok: true; channel: Channel } | { ok: false; error: "too_many" } {
+    if (!this.creations.allow(caller)) return { ok: false, error: "too_many" };
+    return { ok: true, channel: this.store.createChannel(opts) };
   }
 
   getChannel(id: string): Channel | undefined {

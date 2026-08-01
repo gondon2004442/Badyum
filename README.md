@@ -81,7 +81,7 @@ npx wrangler secret put BADYUM_TOKEN_SECRET      # openssl rand -hex 32
 npx wrangler secret put BADYUM_CF_TURN_KEY_ID
 npx wrangler secret put BADYUM_CF_TURN_API_TOKEN
 
-pnpm deploy
+pnpm release
 ```
 
 Адрес будет вида `https://badyum.<твой>.workers.dev` и работает сразу. Свой
