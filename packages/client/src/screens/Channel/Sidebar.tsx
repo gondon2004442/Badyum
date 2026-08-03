@@ -1,6 +1,13 @@
-import { LinkIcon, SlidersIcon, SpeakerIcon } from "../../components/Icons.tsx";
+import {
+  ExitIcon,
+  GoogleIcon,
+  LinkIcon,
+  SlidersIcon,
+  SpeakerIcon,
+} from "../../components/Icons.tsx";
 import { Avatar } from "../../components/Avatar.tsx";
 import { forgetChannel, type RecentChannel } from "../../storage.ts";
+import { loginUrl, type Account } from "../../account.ts";
 
 interface SidebarProps {
   /** null — мы не в канале: сайдбар тот же, активной строки просто нет. */
@@ -14,6 +21,11 @@ interface SidebarProps {
   onNewChannel: () => void;
   onChanged: () => void;
   onOpenSettings: () => void;
+  /** Аккаунт, если человек вошёл. Гость — null, и это нормальный режим. */
+  account: Account | null;
+  /** Настроен ли вход. Кнопку, которая не сработает, показывать нельзя. */
+  loginAvailable: boolean;
+  onLogout: () => void;
 }
 
 /**
@@ -34,6 +46,9 @@ export function Sidebar({
   onNewChannel,
   onChanged,
   onOpenSettings,
+  account,
+  loginAvailable,
+  onLogout,
 }: SidebarProps) {
   const others = recent.filter((c) => c.channelId !== channelId);
 
@@ -97,12 +112,57 @@ export function Sidebar({
         </div>
       </div>
 
+      {/*
+        Вход предлагаем только гостю и только если он настроен. Кнопка, которая
+        приводит к «501 не настроено», хуже отсутствующей.
+      */}
+      {!account && loginAvailable ? (
+        <a className="sidebar__login" href={loginUrl()}>
+          <GoogleIcon size={15} />
+          Войти через Google
+        </a>
+      ) : null}
+
       <div className="sidebar__me">
-        <Avatar userId={selfIdentity} name={selfName} className="sidebar__avatar" />
+        {account?.avatarUrl ? (
+          // Аватар от Google — обычная картинка, и она может не загрузиться.
+          // Тогда остаётся то же место и те же инициалы, что у гостя.
+          <img
+            className="sidebar__avatar sidebar__avatar--photo"
+            src={account.avatarUrl}
+            alt=""
+            referrerPolicy="no-referrer"
+          />
+        ) : (
+          // Инициалы и цвет берём от того же, чьё имя написано рядом: иначе у
+          // вошедшего под ником dumax в квадрате оставалось «ГО» от гостя.
+          <Avatar
+            userId={account?.id ?? selfIdentity}
+            name={account?.nick ?? selfName}
+            className="sidebar__avatar"
+          />
+        )}
         <div className="sidebar__identity">
-          <span className="sidebar__myname">{selfName}</span>
-          <span className="sidebar__mytag">#{selfIdentity.slice(0, 4)}</span>
+          <span className="sidebar__myname">{account?.nick ?? selfName}</span>
+          <span className="sidebar__mytag">
+            {/*
+              У гостя тег — обрезок локального идентификатора: он ничего не
+              подтверждает и живёт только в этом браузере. У вошедшего — настоящий,
+              выданный сервисом, и по нему человека можно найти.
+            */}
+            #{account?.tag ?? selfIdentity.slice(0, 4)}
+          </span>
         </div>
+        {account ? (
+          <button
+            className="sidebar__gear"
+            onClick={onLogout}
+            title={`Выйти из аккаунта ${account.nick}#${account.tag}`}
+            type="button"
+          >
+            <ExitIcon size={16} />
+          </button>
+        ) : null}
         <button className="sidebar__gear" onClick={onOpenSettings} title="Настройки" type="button">
           <SlidersIcon size={16} />
         </button>

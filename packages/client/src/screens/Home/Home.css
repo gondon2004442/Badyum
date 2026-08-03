@@ -218,8 +218,65 @@
   color: var(--text-muted);
 }
 
+/*
+  Строка аккаунта на узком экране. По умолчанию скрыта: на широком то же самое
+  показывает сайдбар, и два входа рядом читались бы как два разных.
+*/
+.home__account {
+  display: none;
+  align-items: center;
+  gap: 9px;
+  margin-bottom: 22px;
+}
+
+.home__account-name {
+  flex: 1;
+  min-width: 0;
+  font-size: 13px;
+  font-weight: 600;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.home__account-tag {
+  margin-left: 4px;
+  font-family: var(--font-mono);
+  font-size: 10px;
+  font-weight: 400;
+  color: var(--text-muted);
+}
+
+.home__account-out {
+  padding: 7px 11px;
+  border-radius: var(--radius-md);
+  background: var(--bg-surface);
+  border: 1px solid var(--border-subtle);
+  color: var(--text-muted);
+  font-size: 12px;
+}
+
+.home__account-in {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 9px 13px;
+  border-radius: var(--radius-md);
+  background: var(--bg-surface);
+  border: 1px solid var(--border-strong);
+  color: var(--text-secondary);
+  font-size: 12.5px;
+  font-weight: 600;
+  text-decoration: none;
+}
+
 @media (max-width: 1100px) {
   .shell--home {
     grid-template-columns: minmax(0, 1fr);
+  }
+
+  /* Пустой блок места бы не занял, но у него есть margin — прячем и его. */
+  .home__account:not(:empty) {
+    display: flex;
   }
 }

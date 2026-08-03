@@ -12,6 +12,7 @@ import {
   SpeakerIcon,
 } from "../../components/Icons.tsx";
 import { InviteTile } from "./InviteTile.tsx";
+import { useAccount } from "../../account.ts";
 import { Sidebar } from "./Sidebar.tsx";
 import { ChatPanel } from "./ChatPanel.tsx";
 import { PeoplePanel } from "./PeoplePanel.tsx";
@@ -77,6 +78,7 @@ export function ChannelScreen({
   onNewChannel,
 }: ChannelScreenProps) {
   const voice = useVoice();
+  const account = useAccount();
   const [pttEnabled, setPttEnabled] = useState(false);
   const [joined, setJoined] = useState(false);
   const [globalKey, setGlobalKey] = useState<string | null>(null);
@@ -186,6 +188,9 @@ export function ChannelScreen({
         onOpenChannel={onOpenChannel}
         onNewChannel={onNewChannel}
         onChanged={() => setStorageTick((t) => t + 1)}
+        account={account.account}
+        loginAvailable={account.available}
+        onLogout={() => void account.logout()}
         onOpenSettings={() => setSettingsOpen(true)}
       />
 

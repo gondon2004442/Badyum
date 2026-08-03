@@ -1,11 +1,11 @@
 import { useMemo, useState, type FormEvent } from "react";
+import { loginUrl, nameFor, useAccount } from "../../account.ts";
 import { Sidebar } from "../Channel/Sidebar.tsx";
 import { Avatar } from "../../components/Avatar.tsx";
-import { LinkIcon, SpeakerIcon } from "../../components/Icons.tsx";
+import { GoogleIcon, LinkIcon, SpeakerIcon } from "../../components/Icons.tsx";
 import {
   knownPeople,
   myIdentityId,
-  myName,
   recentChannels,
   type RecentChannel,
 } from "../../storage.ts";
@@ -45,9 +45,10 @@ export function HomeScreen({
 }: HomeScreenProps) {
   const [word, setWord] = useState("");
   const [tick, setTick] = useState(0);
+  const account = useAccount();
 
   const identity = myIdentityId();
-  const name = myName() || "гость";
+  const name = nameFor(account.account);
   const recent = useMemo(() => recentChannels(), [tick]);
   const known = useMemo(() => knownPeople(), [tick]);
 
@@ -69,11 +70,49 @@ export function HomeScreen({
         onOpenChannel={onOpenChannel}
         onNewChannel={onNewChannel}
         onChanged={() => setTick((t) => t + 1)}
+        account={account.account}
+        loginAvailable={account.available}
+        onLogout={() => void account.logout()}
         onOpenSettings={() => setTick((t) => t + 1)}
       />
 
       <main className="home">
         <div className="home__inner">
+          {/*
+            Дубль того, что на широком экране живёт в сайдбаре. Сайдбар ниже
+            1100 px скрыт целиком — а телефон это основное устройство, и без
+            этой строки войти с него было бы нечем. Показ решает CSS по той же
+            границе, что прячет сайдбар, поэтому две копии никогда не видны
+            одновременно.
+          */}
+          <div className="home__account">
+            {account.account ? (
+              <>
+                <Avatar
+                  userId={account.account.id}
+                  name={account.account.nick}
+                  className="home__person-avatar"
+                />
+                <span className="home__account-name">
+                  {account.account.nick}
+                  <span className="home__account-tag">#{account.account.tag}</span>
+                </span>
+                <button
+                  className="home__account-out"
+                  onClick={() => void account.logout()}
+                  type="button"
+                >
+                  Выйти
+                </button>
+              </>
+            ) : account.available ? (
+              <a className="home__account-in" href={loginUrl()}>
+                <GoogleIcon size={15} />
+                Войти через Google
+              </a>
+            ) : null}
+          </div>
+
           <span className="home__kicker">Голосовые каналы без границ</span>
           <h1 className="home__title">Badyum</h1>
 
@@ -144,7 +183,7 @@ export function HomeScreen({
                 ))}
               </div>
               <p className="home__note">
-                Список хранится только в этом браузере — аккаунтов пока нет.
+                Список хранится только в этом браузере: с кем ты уже был в канале.
               </p>
             </section>
           ) : null}
