@@ -84,6 +84,13 @@ npx wrangler secret put BADYUM_CF_TURN_API_TOKEN
 pnpm release
 ```
 
+Обновить уже выложенный сервис — одна команда, и её же можно звать из корня
+репозитория:
+
+```bash
+git pull origin main && pnpm install && pnpm release
+```
+
 Адрес будет вида `https://badyum.<твой>.workers.dev` и работает сразу. Свой
 домен подключается отдельно: домен должен быть в Cloudflare (перевод
 NS-записей), после чего в панели Workers добавляется Custom Domain.
