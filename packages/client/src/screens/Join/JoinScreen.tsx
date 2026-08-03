@@ -1,6 +1,7 @@
 import { useEffect, useState, type FormEvent } from "react";
 import { ApiError, previewChannel, requestJoin, type PreviewResponse } from "../../api.ts";
 import { Avatar } from "../../components/Avatar.tsx";
+import { useAccount } from "../../account.ts";
 import "./Join.css";
 
 export interface JoinTarget {
@@ -32,6 +33,15 @@ export function JoinScreen({ target, onJoined }: JoinScreenProps) {
   const [name, setName] = useState(() => localStorage.getItem(NAME_KEY) ?? "");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const { account } = useAccount();
+
+  /**
+   * Ник подставляем только в пустое поле: аккаунт приходит асинхронно, и
+   * перезаписать им уже набранное имя означало бы стереть слово из-под рук.
+   */
+  useEffect(() => {
+    if (account) setName((current) => current || account.nick);
+  }, [account]);
 
   useEffect(() => {
     let cancelled = false;
@@ -106,7 +116,11 @@ export function JoinScreen({ target, onJoined }: JoinScreenProps) {
         </button>
 
         {error ? <p className="join__error">{error}</p> : null}
-        <p className="join__note">Регистрация не нужна — только имя</p>
+        <p className="join__note">
+          {account
+            ? `Ты вошёл как ${account.nick}#${account.tag}`
+            : "Регистрация не нужна — только имя"}
+        </p>
       </form>
     </div>
   );

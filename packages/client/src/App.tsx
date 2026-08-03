@@ -3,7 +3,8 @@ import { JoinScreen, type JoinTarget } from "./screens/Join/JoinScreen.tsx";
 import { ChannelScreen } from "./screens/Channel/ChannelScreen.tsx";
 import { HomeScreen } from "./screens/Home/HomeScreen.tsx";
 import { ApiError, createChannel, fetchInviteCode, requestJoin } from "./api.ts";
-import { myName, rememberChannel, type RecentChannel } from "./storage.ts";
+import { rememberChannel, type RecentChannel } from "./storage.ts";
+import { nameFor, useAccount } from "./account.ts";
 
 interface Session {
   token: string;
@@ -35,6 +36,7 @@ export function App() {
   const [session, setSession] = useState<Session | null>(null);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const { account } = useAccount();
 
   const enter = useCallback((next: Session) => {
     rememberChannel({
@@ -70,28 +72,28 @@ export function App() {
     (channel: RecentChannel) => {
       if (!channel.code) return;
       void go(async () => {
-        const displayName = myName() || "гость";
+        const displayName = nameFor(account);
         const code = channel.code!;
         const result = await requestJoin({ displayName, code });
         return { ...result, displayName, code };
       });
     },
-    [go],
+    [go, account],
   );
 
   const newChannel = useCallback(() => {
     void go(async () => {
-      const displayName = myName() || "гость";
+      const displayName = nameFor(account);
       const created = await createChannel("Новый канал");
       const result = await requestJoin({ displayName, code: created.inviteCode });
       return { ...result, displayName, code: created.inviteCode };
     });
-  }, [go]);
+  }, [go, account]);
 
   const openWord = useCallback(
     (word: string) => {
       void go(async () => {
-        const displayName = myName() || "гость";
+        const displayName = nameFor(account);
         const result = await requestJoin({ displayName, slug: word });
         // У канала по слову инвайта может не быть — попросим его отдельно,
         // иначе в «недавних» окажется строка, по которой не вернуться.
@@ -99,7 +101,7 @@ export function App() {
         return { ...result, displayName, code: invite?.code ?? null };
       });
     },
-    [go],
+    [go, account],
   );
 
   if (session) {
