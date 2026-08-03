@@ -98,6 +98,29 @@ pnpm --filter @badyum/worker dev:worker
 Секреты wrangler читает именно из `.dev.vars` — переменные окружения оболочки
 до Worker'а не доезжают.
 
+### Аккаунты (необязательно)
+
+Гостевой вход работает без всего этого и работать не перестанет: аккаунт даёт
+постоянный ник `дюма#4821`, а не право говорить.
+
+```bash
+cd packages/worker
+npx wrangler d1 create badyum          # database_id вписать в wrangler.jsonc
+npx wrangler d1 migrations apply badyum
+
+# Google Cloud Console → APIs & Services → Credentials → OAuth client ID
+# (тип «Web application»). В Authorized redirect URIs перечислить каждый адрес,
+# с которого сервис отвечает:
+#   https://badyum.<аккаунт>.workers.dev/api/auth/google/callback
+#   https://badyum.ru/api/auth/google/callback
+npx wrangler secret put BADYUM_GOOGLE_CLIENT_ID
+npx wrangler secret put BADYUM_GOOGLE_CLIENT_SECRET
+```
+
+Пока секреты не заданы, `/api/me` отвечает `googleEnabled: false`, и клиент не
+показывает кнопку входа — предлагать то, что не настроено, хуже, чем не
+предлагать вовсе.
+
 **Ограничение бесплатного плана:** 100 000 запросов в сутки, и каждое сообщение
 WebSocket считается запросом. Ping и pong обслуживает сама платформа
 (`setWebSocketAutoResponse`) и объект при этом не будит, но индикатор речи шлёт
