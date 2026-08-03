@@ -3,6 +3,7 @@ import { identityIdSchema } from "@badyum/shared";
 import { newUserId, normalizeDisplayName, TokenSigner } from "@badyum/core";
 import { Registry } from "./Registry.ts";
 import { ChannelRoom } from "./ChannelRoom.ts";
+import { Auth } from "./auth.ts";
 import type { Env } from "./env.ts";
 
 export { Registry, ChannelRoom };
@@ -60,6 +61,38 @@ export default {
       if (!claims) return new Response("токен недействителен", { status: 401 });
 
       return roomOf(env, claims.channelId).fetch(request);
+    }
+
+    /**
+     * Аккаунты.
+     *
+     * Всё здесь необязательно: гость по-прежнему заходит по ссылке, введя одно
+     * имя, и ни один из этих маршрутов ему не нужен. Аккаунт добавляет
+     * постоянный ник, а не право говорить.
+     */
+    if (path === "/api/auth/google") return new Auth(env).start(request);
+    if (path === "/api/auth/google/callback") return new Auth(env).callback(request);
+    if (path === "/api/auth/logout" && request.method === "POST") {
+      return new Auth(env).logout();
+    }
+
+    if (path === "/api/me") {
+      const auth = new Auth(env);
+      const user = await auth.current(request);
+      return json({
+        user: user
+          ? {
+              id: user.id,
+              nick: user.nick,
+              tag: user.tag,
+              displayName: user.displayName,
+              avatarUrl: user.avatarUrl,
+            }
+          : null,
+        // Клиент по этому полю решает, показывать ли кнопку входа: предлагать
+        // то, что не настроено, хуже, чем не предлагать вовсе.
+        googleEnabled: auth.configured(),
+      });
     }
 
     if (path === "/api/health") {

@@ -29,6 +29,20 @@
     "run_worker_first": ["/api/*", "/ws"]
   },
 
+  /**
+   * База пользователей. Создаётся один раз:
+   *   npx wrangler d1 create badyum
+   * и полученный database_id подставляется сюда.
+   */
+  "d1_databases": [
+    {
+      "binding": "DB",
+      "database_name": "badyum",
+      "database_id": "PLACEHOLDER-СОЗДАЙ-БАЗУ",
+      "migrations_dir": "migrations"
+    }
+  ],
+
   "durable_objects": {
     "bindings": [
       // Каталог каналов и инвайтов: коды и кодовые слова уникальны глобально.
