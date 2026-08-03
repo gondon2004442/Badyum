@@ -105,8 +105,9 @@ pnpm --filter @badyum/worker dev:worker
 
 ```bash
 cd packages/worker
-npx wrangler d1 create badyum          # database_id вписать в wrangler.jsonc
-npx wrangler d1 migrations apply badyum
+# База уже создана, database_id прописан в wrangler.jsonc. Для новой:
+#   npx wrangler d1 create <имя>  — или в панели: Storage & Databases → D1
+npx wrangler d1 migrations apply badyuma
 
 # Google Cloud Console → APIs & Services → Credentials → OAuth client ID
 # (тип «Web application»). В Authorized redirect URIs перечислить каждый адрес,

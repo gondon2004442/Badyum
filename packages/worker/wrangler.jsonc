@@ -30,15 +30,16 @@
   },
 
   /**
-   * База пользователей. Создаётся один раз:
-   *   npx wrangler d1 create badyum
-   * и полученный database_id подставляется сюда.
+   * База пользователей.
+   *
+   * database_id — не секрет: без доступа к аккаунту он бесполезен, и сам
+   * Cloudflare держит его в этом файле.
    */
   "d1_databases": [
     {
       "binding": "DB",
-      "database_name": "badyum",
-      "database_id": "PLACEHOLDER-СОЗДАЙ-БАЗУ",
+      "database_name": "badyuma",
+      "database_id": "1aa7dfb4-2939-4406-81bf-c4af41b412d5",
       "migrations_dir": "migrations"
     }
   ],
