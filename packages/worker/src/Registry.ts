@@ -1,9 +1,10 @@
 import { DurableObject } from "cloudflare:workers";
 import {
+  ChannelGate,
   ChannelStore,
-  RateLimiter,
   type Channel,
   type ChannelSink,
+  type Creator,
   type Invite,
 } from "@badyum/core";
 
@@ -11,11 +12,12 @@ const CHANNEL_PREFIX = "ch:";
 const INVITE_PREFIX = "inv:";
 
 /**
- * Сколько каналов можно создать с одного адреса за час.
+ * Сколько каналов можно завести за час — на аккаунт, а не на адрес.
  *
  * Живой человек нажимает «Новый канал» несколько раз за вечер, так что двадцать
  * — это с запасом. Ограничение нужно не против него, а против цикла в консоли:
- * ручка публичная, а каждый канал занимает место в хранилище каталога навсегда.
+ * каждый канал занимает место в хранилище каталога навсегда. Требование войти
+ * делает такой цикл дорогим, а этот лимит — ещё и медленным.
  */
 const CHANNELS_PER_HOUR = 20;
 const HOUR_MS = 60 * 60 * 1000;
@@ -35,11 +37,13 @@ const HOUR_MS = 60 * 60 * 1000;
 export class Registry extends DurableObject {
   private readonly store: ChannelStore;
   /**
+   * Право заводить каналы и счётчик частоты.
+   *
    * Счётчик держится в памяти и не переживает засыпание объекта. Это осознанно:
    * хранить его — значит писать в хранилище на каждое нажатие кнопки, а цена
    * промаха здесь всего лишь ещё двадцать каналов у настойчивого скрипта.
    */
-  private readonly creations = new RateLimiter(CHANNELS_PER_HOUR, HOUR_MS);
+  private readonly gate: ChannelGate;
 
   constructor(ctx: DurableObjectState, env: unknown) {
     super(ctx, env as never);
@@ -54,6 +58,7 @@ export class Registry extends DurableObject {
       removeInvite: (code) => void ctx.storage.delete(INVITE_PREFIX + code),
     };
     this.store = new ChannelStore(sink);
+    this.gate = new ChannelGate(this.store, CHANNELS_PER_HOUR, HOUR_MS);
 
     /**
      * Загрузка до первого запроса.
@@ -82,18 +87,13 @@ export class Registry extends DurableObject {
   }
 
   /**
-   * Создание канала по запросу извне — с ограничением частоты.
+   * Создание канала по запросу извне — с правом и ограничением частоты.
    *
-   * Отдельный метод, а не флаг у createChannel: канал по свободному кодовому
-   * слову создаётся внутри resolve, и туда лимит по адресу не относится — там
-   * человек не «плодит каналы», а входит в тот, о котором договорились.
+   * `caller === null` означает «права нет»: кто его имеет, решает Worker, а
+   * правило целиком живёт в ChannelGate.
    */
-  createChannelFor(
-    caller: string,
-    opts: { name: string; slug?: string | null },
-  ): { ok: true; channel: Channel } | { ok: false; error: "too_many" } {
-    if (!this.creations.allow(caller)) return { ok: false, error: "too_many" };
-    return { ok: true, channel: this.store.createChannel(opts) };
+  createChannelFor(caller: Creator, opts: { name: string; slug?: string | null }) {
+    return this.gate.create(caller, opts);
   }
 
   getChannel(id: string): Channel | undefined {
@@ -119,11 +119,17 @@ export class Registry extends DurableObject {
     return this.store.findInviteForChannel(channelId);
   }
 
-  resolve(
-    input: { code?: string; slug?: string; channelId?: string },
-    opts: { createMissingSlug?: boolean } = {},
-  ) {
-    return this.store.resolve(input, opts);
+  /** Только поиск, без создания: этим живёт предпросмотр канала до входа. */
+  resolve(input: { code?: string; slug?: string; channelId?: string }) {
+    return this.store.resolve(input, { createMissingSlug: false });
+  }
+
+  /**
+   * Вход: существующий канал отдаётся всем, свободное слово превращается в
+   * канал только для того, у кого есть на это право.
+   */
+  resolveFor(caller: Creator, input: { code?: string; slug?: string; channelId?: string }) {
+    return this.gate.resolve(caller, input);
   }
 
   consumeInvite(code: string): void {

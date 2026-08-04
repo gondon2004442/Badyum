@@ -13,6 +13,8 @@
     "build": "pnpm --filter \"./packages/*\" build",
     "typecheck": "pnpm --filter \"./packages/*\" typecheck",
     "test": "pnpm --filter \"./packages/*\" test",
+    "//release": "Выкладка в прод из корня. Сам скрипт живёт в пакете worker, но искать его там надо знать: из корня «pnpm release» просто не находило команду.",
+    "release": "pnpm --filter @badyum/worker release",
     "turn": "docker compose -f infra/docker-compose.yml up -d",
     "demo": "pnpm --filter @badyum/client build && pnpm --parallel --filter @badyum/server --filter @badyum/client serve"
   },

@@ -30,6 +30,8 @@ const MESSAGES: Record<string, string> = {
   channel_full: "В канале нет свободных мест",
   bad_input: "Не разобрал ссылку или код",
   bad_display_name: "Такое имя не подойдёт",
+  auth_required: "Создавать каналы могут только вошедшие — войди через Google",
+  too_many: "Слишком много новых каналов подряд. Попробуй через час",
 };
 
 /**
@@ -50,6 +52,10 @@ export function publicOrigin(): string {
 async function request<T>(path: string, init?: RequestInit): Promise<T> {
   const response = await fetch(`${SERVER_ORIGIN}${path}`, {
     ...init,
+    // Куку сессии надо приложить: по ней сервер решает, можно ли завести канал.
+    // Для страницы с того же адреса это и так по умолчанию, но в десктопной
+    // обёртке страница грузится из локальных файлов, и там уже нет.
+    credentials: "include",
     headers: { "content-type": "application/json", ...init?.headers },
   });
 

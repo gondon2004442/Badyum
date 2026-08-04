@@ -734,6 +734,8 @@
   letter-spacing: 0.06em;
   text-transform: uppercase;
   color: var(--text-secondary);
+  /* Гостю на этом месте ссылка входа, а не кнопка: см. Sidebar. */
+  text-decoration: none;
 }
 
 .sidebar__new:hover {
