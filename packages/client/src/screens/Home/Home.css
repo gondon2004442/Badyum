@@ -47,6 +47,8 @@
   font-weight: 700;
   letter-spacing: 0.09em;
   text-transform: uppercase;
+  /* Гостю на этом месте ссылка входа, а не кнопка: см. HomeScreen. */
+  text-decoration: none;
 }
 
 .home__primary:hover:not(:disabled) {

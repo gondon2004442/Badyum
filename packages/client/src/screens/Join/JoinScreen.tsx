@@ -1,7 +1,8 @@
 import { useEffect, useState, type FormEvent } from "react";
 import { ApiError, previewChannel, requestJoin, type PreviewResponse } from "../../api.ts";
 import { Avatar } from "../../components/Avatar.tsx";
-import { useAccount } from "../../account.ts";
+import { loginUrl, useAccount } from "../../account.ts";
+import { GoogleIcon } from "../../components/Icons.tsx";
 import "./Join.css";
 
 export interface JoinTarget {
@@ -33,7 +34,7 @@ export function JoinScreen({ target, onJoined }: JoinScreenProps) {
   const [name, setName] = useState(() => localStorage.getItem(NAME_KEY) ?? "");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const { account } = useAccount();
+  const { account, available } = useAccount();
 
   /**
    * Ник подставляем только в пустое поле: аккаунт приходит асинхронно, и
@@ -79,12 +80,25 @@ export function JoinScreen({ target, onJoined }: JoinScreenProps) {
   const channelName = preview?.channelName ?? target.slug ?? "канал";
   const inside = preview?.participants ?? [];
 
+  /**
+   * Комнаты по такому слову ещё нет, и завести её гость не может: создание
+   * закрыто входом, иначе запрет обходился бы случайным словом. Говорим об
+   * этом сразу, а не после того, как человек введёт имя и нажмёт кнопку.
+   *
+   * Ссылка-приглашение сюда не попадает: за ней стоит существующий канал, и
+   * гость по-прежнему заходит в него, введя одно имя.
+   */
+  const mustLogIn = preview?.exists === false && !account && available;
+
   return (
     <div className="join">
       <form className="join__inner" onSubmit={submit}>
         <div className="join__mark">B</div>
 
-        <span className="join__kicker">Тебя зовут в голосовой канал</span>
+        <span className="join__kicker">
+          {/* «Тебя зовут» — про чужую ссылку. Свободное слово никто не звал. */}
+          {mustLogIn ? "Комната по кодовому слову" : "Тебя зовут в голосовой канал"}
+        </span>
         <h1 className="join__channel">{channelName}</h1>
 
         {inside.length > 0 ? (
@@ -97,29 +111,42 @@ export function JoinScreen({ target, onJoined }: JoinScreenProps) {
             {describeInside(inside.map((p) => p.displayName))}
           </div>
         ) : (
-          <div className="join__who">Пока никого — зайди первым</div>
+          <div className="join__who">
+            {mustLogIn ? "Такой комнаты ещё нет" : "Пока никого — зайди первым"}
+          </div>
         )}
 
-        <input
-          className="join__field"
-          value={name}
-          onChange={(e) => setName(e.target.value)}
-          placeholder="Как тебя звать?"
-          maxLength={32}
-          autoFocus
-          aria-label="Твоё имя в канале"
-        />
-        <p className="join__label">Как тебя будет видно в канале</p>
+        {mustLogIn ? (
+          <a className="join__cta join__cta--login" href={loginUrl()}>
+            <GoogleIcon size={16} />
+            Войти и создать комнату
+          </a>
+        ) : (
+          <>
+            <input
+              className="join__field"
+              value={name}
+              onChange={(e) => setName(e.target.value)}
+              placeholder="Как тебя звать?"
+              maxLength={32}
+              autoFocus
+              aria-label="Твоё имя в канале"
+            />
+            <p className="join__label">Как тебя будет видно в канале</p>
 
-        <button className="join__cta" type="submit" disabled={!name.trim() || busy}>
-          {busy ? "Подключаюсь…" : "Войти в канал"}
-        </button>
+            <button className="join__cta" type="submit" disabled={!name.trim() || busy}>
+              {busy ? "Подключаюсь…" : "Войти в канал"}
+            </button>
+          </>
+        )}
 
         {error ? <p className="join__error">{error}</p> : null}
         <p className="join__note">
           {account
             ? `Ты вошёл как ${account.nick}#${account.tag}`
-            : "Регистрация не нужна — только имя"}
+            : mustLogIn
+              ? "Заходить по чужой ссылке вход не нужен — только заводить свои комнаты"
+              : "Регистрация не нужна — только имя"}
         </p>
       </form>
     </div>

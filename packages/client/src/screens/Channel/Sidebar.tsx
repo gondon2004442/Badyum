@@ -51,6 +51,8 @@ export function Sidebar({
   onLogout,
 }: SidebarProps) {
   const others = recent.filter((c) => c.channelId !== channelId);
+  /** То же правило, что на сервере: право даёт вход, а без входа — не требуется. */
+  const canCreate = Boolean(account) || !loginAvailable;
 
   return (
     <aside className="sidebar">
@@ -105,10 +107,19 @@ export function Sidebar({
             </p>
           ) : null}
 
-          <button className="sidebar__new" onClick={onNewChannel} type="button">
-            <LinkIcon size={14} />
-            Новый канал
-          </button>
+          {/*
+            Заводить каналы могут только вошедшие — иначе каталог разносится
+            циклом в консоли. Гостю кнопку не показываем вовсе: предложение
+            войти уже стоит ниже, в этой же колонке, и второе такое же рядом
+            читалось бы как другое действие. На вход по чужой ссылке запрет не
+            влияет — там кнопка и не нужна.
+          */}
+          {canCreate ? (
+            <button className="sidebar__new" onClick={onNewChannel} type="button">
+              <LinkIcon size={14} />
+              Новый канал
+            </button>
+          ) : null}
         </div>
       </div>
 

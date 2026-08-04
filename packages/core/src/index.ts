@@ -8,6 +8,7 @@
  */
 export * from "./ids.ts";
 export * from "./channels.ts";
+export * from "./gate.ts";
 export * from "./chat.ts";
 export * from "./rooms.ts";
 export * from "./tokens.ts";

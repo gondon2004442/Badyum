@@ -49,6 +49,13 @@ export function HomeScreen({
 
   const identity = myIdentityId();
   const name = nameFor(account.account);
+  /**
+   * Право заводить каналы — то же правило, что на сервере: даёт вход, а там,
+   * где вход не настроен, не требуется вовсе. Пока идёт загрузка считаем, что
+   * право есть: мигнуть кнопкой «войти» вошедшему человеку хуже, чем на
+   * мгновение показать кнопку тому, кому она не сработает.
+   */
+  const canCreate = Boolean(account.account) || !account.available;
   const recent = useMemo(() => recentChannels(), [tick]);
   const known = useMemo(() => knownPeople(), [tick]);
 
@@ -116,15 +123,28 @@ export function HomeScreen({
           <span className="home__kicker">Голосовые каналы без границ</span>
           <h1 className="home__title">Badyum</h1>
 
-          <button
-            className="home__primary"
-            onClick={onNewChannel}
-            disabled={busy}
-            type="button"
-          >
-            <LinkIcon size={15} />
-            {busy ? "Создаю…" : "Создать канал"}
-          </button>
+          {/*
+            Гостю предлагаем вход вместо кнопки, а не кнопку, которая ответит
+            «войди». Создание закрыто входом намеренно: канал в каталоге стоит
+            одного запроса, и без этого сервис разносится циклом в консоли.
+            Заходить по чужой ссылке вход по-прежнему не нужен.
+          */}
+          {canCreate ? (
+            <button
+              className="home__primary"
+              onClick={onNewChannel}
+              disabled={busy}
+              type="button"
+            >
+              <LinkIcon size={15} />
+              {busy ? "Создаю…" : "Создать канал"}
+            </button>
+          ) : (
+            <a className="home__primary" href={loginUrl()}>
+              <GoogleIcon size={15} />
+              Войти, чтобы создать канал
+            </a>
+          )}
 
           <form className="home__word" onSubmit={submit}>
             <input
@@ -140,7 +160,9 @@ export function HomeScreen({
             </button>
           </form>
           <p className="home__hint">
-            Назовите с другом одно и то же слово — окажетесь в одном канале
+            {canCreate
+              ? "Назовите с другом одно и то же слово — окажетесь в одном канале"
+              : "Назовите с другом одно и то же слово. Новую комнату заводит тот, кто вошёл"}
           </p>
 
           {error ? <p className="home__error">{error}</p> : null}
