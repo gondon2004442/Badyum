@@ -1,4 +1,5 @@
 import type { ChannelRoom } from "./ChannelRoom.ts";
+import type { Presence } from "./Presence.ts";
 import type { Registry } from "./Registry.ts";
 
 export interface Env {
@@ -6,6 +7,11 @@ export interface Env {
   REGISTRY: DurableObjectNamespace<Registry>;
   /** Комнаты: по объекту на канал. */
   ROOMS: DurableObjectNamespace<ChannelRoom>;
+  /**
+   * Кто в сети и кто кому звонит. Экземпляр один: чтобы узнать, в сети ли
+   * друг, надо смотреть в одно место.
+   */
+  PRESENCE: DurableObjectNamespace<Presence>;
   /** Статика собранного клиента. */
   ASSETS: Fetcher;
   /**
