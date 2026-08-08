@@ -3,10 +3,13 @@ import { identityIdSchema } from "@badyum/shared";
 import { newUserId, normalizeDisplayName, TokenSigner } from "@badyum/core";
 import { Registry } from "./Registry.ts";
 import { ChannelRoom } from "./ChannelRoom.ts";
+import { Presence } from "./Presence.ts";
 import { Auth } from "./auth.ts";
+import { handleContacts } from "./api/contacts.ts";
+import { json } from "./http.ts";
 import type { Env } from "./env.ts";
 
-export { Registry, ChannelRoom };
+export { Registry, ChannelRoom, Presence };
 
 /**
  * Каталог один на весь сервис, поэтому и имя у него одно фиксированное. Будь
@@ -35,9 +38,6 @@ const joinBodySchema = z
   .refine((b) => b.code !== undefined || b.slug !== undefined || b.channelId !== undefined, {
     message: "нужен code, slug или channelId",
   });
-
-const json = (body: unknown, status = 200) =>
-  Response.json(body, { status, headers: { "cache-control": "no-store" } });
 
 /**
  * Кто отвечает за созданный канал.
@@ -88,6 +88,37 @@ export default {
     }
 
     /**
+     * Присутствие и звонки.
+     *
+     * Личность берём из куки сессии и передаём объекту заголовком: сам он
+     * чужим словам о том, кто пришёл, не верит. Гостю здесь делать нечего —
+     * ни друзей, ни имени, по которому ему позвонят, у него нет.
+     */
+    if (path === "/presence") {
+      const viewer = await new Auth(env).current(request);
+      if (!viewer) return new Response("нужен вход", { status: 401 });
+
+      const who = {
+        userId: viewer.id,
+        nick: viewer.nick,
+        tag: viewer.tag,
+        displayName: viewer.displayName,
+        avatarUrl: viewer.avatarUrl,
+      };
+
+      // btoa, потому что заголовок обязан быть ASCII, а в имени бывает
+      // кириллица. Не шифрование — просто способ довезти байты.
+      const headers = new Headers(request.headers);
+      headers.set(
+        "x-badyum-user",
+        btoa(String.fromCharCode(...new TextEncoder().encode(JSON.stringify(who)))),
+      );
+
+      const presence = env.PRESENCE.get(env.PRESENCE.idFromName("global"));
+      return presence.fetch(new Request(request, { headers }));
+    }
+
+    /**
      * Аккаунты.
      *
      * Всё здесь необязательно: гость по-прежнему заходит по ссылке, введя одно
@@ -117,6 +148,19 @@ export default {
         // то, что не настроено, хуже, чем не предлагать вовсе.
         googleEnabled: auth.configured(),
       });
+    }
+
+    /**
+     * Контакты. Вход обязателен — у гостя их и быть не может: он никто, пока
+     * не завёл аккаунт, и звать его в друзья некому.
+     */
+    if (path.startsWith("/api/contacts")) {
+      const viewer = await new Auth(env).current(request);
+      if (!viewer) return json({ error: "auth_required" }, 401);
+
+      const handled = await handleContacts(request, url, env, viewer);
+      if (handled) return handled;
+      return json({ error: "not_found" }, 404);
     }
 
     if (path === "/api/health") {

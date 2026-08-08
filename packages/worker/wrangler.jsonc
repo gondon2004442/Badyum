@@ -26,7 +26,7 @@
     "not_found_handling": "single-page-application",
     // Запросы к /api и /ws обязаны дойти до кода, а не быть перехвачены
     // статикой раньше него.
-    "run_worker_first": ["/api/*", "/ws"]
+    "run_worker_first": ["/api/*", "/ws", "/presence"]
   },
 
   /**
@@ -49,13 +49,16 @@
       // Каталог каналов и инвайтов: коды и кодовые слова уникальны глобально.
       { "name": "REGISTRY", "class_name": "Registry" },
       // Комнаты: по объекту на канал, он же держит сокеты участников.
-      { "name": "ROOMS", "class_name": "ChannelRoom" }
+      { "name": "ROOMS", "class_name": "ChannelRoom" },
+      // Присутствие и личные звонки: один объект на весь сервис.
+      { "name": "PRESENCE", "class_name": "Presence" }
     ]
   },
 
   "migrations": [
     { "tag": "v1", "new_sqlite_classes": ["Registry"] },
-    { "tag": "v2", "new_sqlite_classes": ["ChannelRoom"] }
+    { "tag": "v2", "new_sqlite_classes": ["ChannelRoom"] },
+    { "tag": "v3", "new_sqlite_classes": ["Presence"] }
   ],
 
   "vars": {

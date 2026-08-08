@@ -1,5 +1,9 @@
 import { useMemo, useState, type FormEvent } from "react";
+import type { CallEndReason } from "@badyum/shared";
 import { loginUrl, nameFor, useAccount } from "../../account.ts";
+import { useContacts } from "../../contacts.ts";
+import type { PresenceState } from "../../presence.ts";
+import { Contacts } from "./Contacts.tsx";
 import { Sidebar } from "../Channel/Sidebar.tsx";
 import { Avatar } from "../../components/Avatar.tsx";
 import { GoogleIcon, LinkIcon, SpeakerIcon } from "../../components/Icons.tsx";
@@ -18,7 +22,20 @@ interface HomeScreenProps {
   onOpenWord: (word: string) => void;
   busy: boolean;
   error: string | null;
+  presence: PresenceState;
 }
+
+/** Что человек делает на этом экране: зовёт знакомого или идёт в канал. */
+type Tab = "contacts" | "channels";
+
+const ENDINGS: Record<CallEndReason, string> = {
+  declined: "Отказался говорить",
+  cancelled: "Звонок отменён",
+  offline: "Уже не в сети",
+  busy: "Сейчас занят другим звонком",
+  not_friends: "Он не в твоих контактах",
+  gone: "Связь оборвалась",
+};
 
 const ago = (at: number): string => {
   const minutes = Math.floor((Date.now() - at) / 60_000);
@@ -42,10 +59,18 @@ export function HomeScreen({
   onOpenWord,
   busy,
   error,
+  presence,
 }: HomeScreenProps) {
   const [word, setWord] = useState("");
   const [tick, setTick] = useState(0);
   const account = useAccount();
+  const contacts = useContacts(account.account);
+  /**
+   * Вошедшему сразу показываем контакты: он пришёл кому-то позвонить. Гостю
+   * контактов нет вовсе, ему остаются каналы.
+   */
+  const [tab, setTab] = useState<Tab>("contacts");
+  const showContacts = Boolean(account.account) && tab === "contacts";
 
   const identity = myIdentityId();
   const name = nameFor(account.account);
@@ -122,6 +147,51 @@ export function HomeScreen({
 
           <span className="home__kicker">Голосовые каналы без границ</span>
           <h1 className="home__title">Badyum</h1>
+
+          {/*
+            Переключатель только для вошедших: у гостя контактов нет вовсе, и
+            вкладка, которая всегда пуста, — это обещание, которое некому
+            выполнить.
+          */}
+          {account.account ? (
+            <div className="home__tabs">
+              <button
+                className={`home__tab${tab === "contacts" ? " home__tab--on" : ""}`}
+                onClick={() => setTab("contacts")}
+                type="button"
+              >
+                Контакты
+                {contacts.incoming.length > 0 ? (
+                  <span className="home__badge">{contacts.incoming.length}</span>
+                ) : null}
+              </button>
+              <button
+                className={`home__tab${tab === "channels" ? " home__tab--on" : ""}`}
+                onClick={() => setTab("channels")}
+                type="button"
+              >
+                Каналы
+              </button>
+            </div>
+          ) : null}
+
+          {presence.lastEnd ? (
+            <p className="home__error" onClick={presence.clearEnd}>
+              {presence.lastEnd.peer ? `${presence.lastEnd.peer.nick}: ` : ""}
+              {ENDINGS[presence.lastEnd.reason]}
+            </p>
+          ) : null}
+
+          {showContacts ? (
+            <Contacts
+              contacts={contacts}
+              online={presence.online}
+              connected={presence.connected}
+              onCall={presence.dial}
+              busy={presence.call !== null || busy}
+            />
+          ) : (
+            <>
 
           {/*
             Гостю предлагаем вход вместо кнопки, а не кнопку, которая ответит
@@ -209,6 +279,8 @@ export function HomeScreen({
               </p>
             </section>
           ) : null}
+            </>
+          )}
         </div>
       </main>
     </div>
