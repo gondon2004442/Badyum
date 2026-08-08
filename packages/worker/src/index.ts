@@ -4,6 +4,8 @@ import { newUserId, normalizeDisplayName, TokenSigner } from "@badyum/core";
 import { Registry } from "./Registry.ts";
 import { ChannelRoom } from "./ChannelRoom.ts";
 import { Auth } from "./auth.ts";
+import { handleContacts } from "./api/contacts.ts";
+import { json } from "./http.ts";
 import type { Env } from "./env.ts";
 
 export { Registry, ChannelRoom };
@@ -35,9 +37,6 @@ const joinBodySchema = z
   .refine((b) => b.code !== undefined || b.slug !== undefined || b.channelId !== undefined, {
     message: "нужен code, slug или channelId",
   });
-
-const json = (body: unknown, status = 200) =>
-  Response.json(body, { status, headers: { "cache-control": "no-store" } });
 
 /**
  * Кто отвечает за созданный канал.
@@ -117,6 +116,19 @@ export default {
         // то, что не настроено, хуже, чем не предлагать вовсе.
         googleEnabled: auth.configured(),
       });
+    }
+
+    /**
+     * Контакты. Вход обязателен — у гостя их и быть не может: он никто, пока
+     * не завёл аккаунт, и звать его в друзья некому.
+     */
+    if (path.startsWith("/api/contacts")) {
+      const viewer = await new Auth(env).current(request);
+      if (!viewer) return json({ error: "auth_required" }, 401);
+
+      const handled = await handleContacts(request, url, env, viewer);
+      if (handled) return handled;
+      return json({ error: "not_found" }, 404);
     }
 
     if (path === "/api/health") {
