@@ -1,5 +1,7 @@
-import { useCallback, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { JoinScreen, type JoinTarget } from "./screens/Join/JoinScreen.tsx";
+import { CallOverlay } from "./screens/Call/CallOverlay.tsx";
+import { usePresence } from "./presence.ts";
 import { ChannelScreen } from "./screens/Channel/ChannelScreen.tsx";
 import { HomeScreen } from "./screens/Home/HomeScreen.tsx";
 import { ApiError, createChannel, fetchInviteCode, requestJoin } from "./api.ts";
@@ -37,6 +39,7 @@ export function App() {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const { account } = useAccount();
+  const presence = usePresence(account);
 
   const enter = useCallback((next: Session) => {
     rememberChannel({
@@ -104,8 +107,48 @@ export function App() {
     [go, account],
   );
 
+  /**
+   * Звонок приняли — оба заходят в один канал по его инвайту.
+   *
+   * Ничего особенного для личного звонка здесь нет: это обычный канал на
+   * двоих, и дальше работает ровно тот же экран разговора. Тем и хорошо —
+   * дозвон добавляет только способ там оказаться.
+   */
+  const joined = useRef<string | null>(null);
+  const callCode = presence.call?.kind === "accepted" ? presence.call.code : null;
+
+  useEffect(() => {
+    // Оба конца получают call_accepted, и оба входят. Отметка нужна, чтобы
+    // повторный рендер не отправил второй запрос на вход в тот же канал.
+    if (!callCode || joined.current === callCode) return;
+    joined.current = callCode;
+
+    void go(async () => {
+      const displayName = nameFor(account);
+      const result = await requestJoin({ displayName, code: callCode });
+      return { ...result, displayName, code: callCode };
+    });
+  }, [callCode, go, account]);
+
+  /**
+   * Звонок поверх всего, включая разговор в канале.
+   *
+   * `accepted` не показываем: в этот момент мы уже заходим в канал, и держать
+   * поверх него карточку звонка значит закрыть собой то, ради чего звонили.
+   */
+  const overlay =
+    presence.call && presence.call.kind !== "accepted" ? (
+      <CallOverlay
+        call={presence.call}
+        onAccept={presence.accept}
+        onHangUp={presence.hangUp}
+      />
+    ) : null;
+
   if (session) {
     return (
+      <>
+        {overlay}
       <ChannelScreen
         // Пересоздаём экран при смене канала: движок держит соединения и
         // переписку внутри, и переиспользовать его между каналами нельзя.
@@ -124,27 +167,33 @@ export function App() {
         onOpenChannel={openChannel}
         onNewChannel={newChannel}
       />
+      </>
     );
   }
 
   if (target) {
     return (
-      <JoinScreen
-        target={target}
-        onJoined={(result) =>
-          enter({ ...result, code: target.code ?? null })
-        }
-      />
+      <>
+        {overlay}
+        <JoinScreen
+          target={target}
+          onJoined={(result) => enter({ ...result, code: target.code ?? null })}
+        />
+      </>
     );
   }
 
   return (
-    <HomeScreen
-      onOpenChannel={openChannel}
-      onNewChannel={newChannel}
-      onOpenWord={openWord}
-      busy={busy}
-      error={error}
-    />
+    <>
+      {overlay}
+      <HomeScreen
+        onOpenChannel={openChannel}
+        onNewChannel={newChannel}
+        onOpenWord={openWord}
+        busy={busy}
+        error={error}
+        presence={presence}
+      />
+    </>
   );
 }

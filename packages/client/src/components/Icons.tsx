@@ -72,6 +72,22 @@ export const SlidersIcon = ({ size = 20, className }: IconProps) => (
   </svg>
 );
 
+export const PhoneIcon = ({ size = 18, className }: IconProps) => (
+  <svg {...base(size)} className={className} aria-hidden>
+    <path d="M6.5 3h-2A1.5 1.5 0 0 0 3 4.6C3 13 11 21 19.4 21a1.5 1.5 0 0 0 1.6-1.5v-2a1 1 0 0 0-.8-1l-3.3-.7a1 1 0 0 0-1 .4l-1 1.3a13.5 13.5 0 0 1-6.4-6.4l1.3-1a1 1 0 0 0 .4-1L9.5 3.8a1 1 0 0 0-1-.8Z" />
+  </svg>
+);
+
+/** Тот же телефон, но положенный — «сбросить». */
+export const PhoneOffIcon = ({ size = 18, className }: IconProps) => (
+  <svg {...base(size)} className={className} aria-hidden>
+    <path d="M2.5 16.2a15 15 0 0 1 19 0" />
+    <path d="M6.6 13.4 4.4 15.6a1.4 1.4 0 0 1-2 0l-.9-1a1.4 1.4 0 0 1 0-2" />
+    <path d="M17.4 13.4l2.2 2.2a1.4 1.4 0 0 0 2 0l.9-1a1.4 1.4 0 0 0 0-2" />
+    <path d="M8.5 12.4v2.2M15.5 12.4v2.2" />
+  </svg>
+);
+
 /**
  * Логотип Google.
  *

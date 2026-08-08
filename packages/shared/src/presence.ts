@@ -49,6 +49,20 @@ export const presenceClientSchema = z.discriminatedUnion("type", [
 
 export type PresenceClientMessage = z.infer<typeof presenceClientSchema>;
 
+/**
+ * Почему звонок кончился, не начавшись.
+ *
+ * Отдельным типом, а не строкой внутри сообщения: клиент переводит это в слова
+ * для человека, и список причин должен быть виден целиком в одном месте.
+ */
+export type CallEndReason =
+  | "declined"
+  | "cancelled"
+  | "offline"
+  | "busy"
+  | "not_friends"
+  | "gone";
+
 export type PresenceServerMessage =
   /** Снимок при подключении и после изменений списка друзей. */
   | { type: "online"; userIds: string[] }
@@ -66,8 +80,4 @@ export type PresenceServerMessage =
    * `reason` не для галочки: «отказался» и «его нет в сети» человек должен
    * различать, иначе он будет перезванивать в пустоту.
    */
-  | {
-      type: "call_ended";
-      callId: string;
-      reason: "declined" | "cancelled" | "offline" | "busy" | "not_friends" | "gone";
-    };
+  | { type: "call_ended"; callId: string; reason: CallEndReason };
