@@ -70,6 +70,20 @@ export interface RecentChannel {
   /** Код инвайта — без него вернуться в канал нечем. */
   code: string | null;
   lastSeen: number;
+  /**
+   * Собеседник, если это личная переписка, а не канал.
+   *
+   * Личный канал и обычный устроены одинаково, но в списке это разные вещи:
+   * «Аня» и «катка» стоят рядом и путаются. Поэтому храним, с кем переписка,
+   * и показываем её отдельным разделом с лицом человека.
+   */
+  peer?: {
+    userId: string;
+    nick: string;
+    tag: string;
+    displayName: string;
+    avatarUrl: string | null;
+  };
 }
 
 export function recentChannels(): RecentChannel[] {

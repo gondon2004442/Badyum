@@ -2,6 +2,7 @@ import { DurableObject } from "cloudflare:workers";
 import {
   ChannelGate,
   ChannelStore,
+  pairOf,
   type Channel,
   type ChannelSink,
   type Creator,
@@ -10,6 +11,13 @@ import {
 
 const CHANNEL_PREFIX = "ch:";
 const INVITE_PREFIX = "inv:";
+/** Личный канал пары: ключ — оба идентификатора в каноническом порядке. */
+const DIRECT_PREFIX = "dm:";
+
+const directKey = (x: string, y: string): string => {
+  const { userA, userB } = pairOf(x, y);
+  return `${userA}|${userB}`;
+};
 
 /**
  * Сколько каналов можно завести за час — на аккаунт, а не на адрес.
@@ -44,6 +52,8 @@ export class Registry extends DurableObject {
    * промаха здесь всего лишь ещё двадцать каналов у настойчивого скрипта.
    */
   private readonly gate: ChannelGate;
+  /** Пара → её личный канал. Держим в памяти, зеркалим в хранилище. */
+  private readonly direct = new Map<string, string>();
 
   constructor(ctx: DurableObjectState, env: unknown) {
     super(ctx, env as never);
@@ -75,6 +85,9 @@ export class Registry extends DurableObject {
         channels: [...channels.values()],
         invites: [...invites.values()],
       });
+
+      const direct = await ctx.storage.list<string>({ prefix: DIRECT_PREFIX });
+      for (const [key, id] of direct) this.direct.set(key.slice(DIRECT_PREFIX.length), id);
     });
   }
 
@@ -94,6 +107,42 @@ export class Registry extends DurableObject {
    */
   createChannelFor(caller: Creator, opts: { name: string; slug?: string | null }) {
     return this.gate.create(caller, opts);
+  }
+
+  /**
+   * Личный канал пары — один и тот же навсегда.
+   *
+   * Раньше каждый звонок заводил новый канал. От этого переписка с человеком
+   * начиналась с нуля после каждого разговора, а в списке каналов копились
+   * одноразовые «Аня и Боря». Здесь пара получает один канал: в нём и переписка,
+   * и звонок, и он же открывается по нажатию на контакт.
+   *
+   * Лимит на создание сюда не относится: канал один на пару и появляется не по
+   * нажатию кнопки, а потому что двое уже друг друга добавили. Считать его
+   * «созданием» значило бы наказывать за то, что у человека много друзей.
+   *
+   * Инвайт бессрочный. Обычные семь дней здесь означали бы, что через неделю
+   * пара не может войти в собственную переписку.
+   */
+  directChannel(a: string, b: string, name: string): { channel: Channel; invite: Invite } {
+    const key = directKey(a, b);
+
+    const known = this.direct.get(key);
+    const existing = known ? this.store.getChannel(known) : undefined;
+    if (existing) {
+      const invite =
+        this.store.findInviteForChannel(existing.id) ??
+        this.store.createInvite(existing.id, { ttlMs: null });
+      return { channel: existing, invite };
+    }
+
+    const channel = this.store.createChannel({ name, ephemeral: false });
+    const invite = this.store.createInvite(channel.id, { ttlMs: null });
+
+    this.direct.set(key, channel.id);
+    void this.ctx.storage.put(DIRECT_PREFIX + key, channel.id);
+
+    return { channel, invite };
   }
 
   getChannel(id: string): Channel | undefined {

@@ -6,6 +6,7 @@ import {
   SpeakerIcon,
 } from "../../components/Icons.tsx";
 import { Avatar } from "../../components/Avatar.tsx";
+import type { Caller } from "@badyum/shared";
 import { forgetChannel, type RecentChannel } from "../../storage.ts";
 import { loginUrl, type Account } from "../../account.ts";
 
@@ -18,6 +19,8 @@ interface SidebarProps {
   participantCount: number;
   recent: RecentChannel[];
   onOpenChannel: (channel: RecentChannel) => void;
+  /** Открыть переписку с человеком. Отдельно: у неё своё лицо и свой раздел. */
+  onOpenDirect?: (peer: Caller) => void;
   onNewChannel: () => void;
   onChanged: () => void;
   onOpenSettings: () => void;
@@ -43,6 +46,7 @@ export function Sidebar({
   participantCount,
   recent,
   onOpenChannel,
+  onOpenDirect,
   onNewChannel,
   onChanged,
   onOpenSettings,
@@ -50,7 +54,11 @@ export function Sidebar({
   loginAvailable,
   onLogout,
 }: SidebarProps) {
-  const others = recent.filter((c) => c.channelId !== channelId);
+  // Личные переписки и каналы — два разных списка. Вперёд идут люди: к ним
+  // возвращаются чаще, чем в комнату по кодовому слову.
+  const rest = recent.filter((c) => c.channelId !== channelId);
+  const directs = rest.filter((c) => c.peer);
+  const others = rest.filter((c) => !c.peer);
   /** То же правило, что на сервере: право даёт вход, а без входа — не требуется. */
   const canCreate = Boolean(account) || !loginAvailable;
 
@@ -62,6 +70,55 @@ export function Sidebar({
       </div>
 
       <div className="sidebar__scroll">
+        {/*
+          Личные переписки впереди каналов: к людям возвращаются чаще, чем в
+          комнату по кодовому слову. Раздела нет вовсе, пока переписок нет —
+          пустой заголовок только занимал бы место.
+        */}
+        {directs.length > 0 && onOpenDirect ? (
+          <div className="sidebar__section">
+            <span className="sidebar__label">Личные</span>
+
+            {directs.map((chat) => (
+              <div key={chat.channelId} className="chan">
+                <button
+                  className="chan__open"
+                  onClick={() => onOpenDirect(chat.peer!)}
+                  title={`Переписка с ${chat.peer!.nick}`}
+                  type="button"
+                >
+                  {chat.peer!.avatarUrl ? (
+                    <img
+                      className="chan__face chan__face--photo"
+                      src={chat.peer!.avatarUrl}
+                      alt=""
+                      referrerPolicy="no-referrer"
+                    />
+                  ) : (
+                    <Avatar
+                      userId={chat.peer!.userId}
+                      name={chat.peer!.nick}
+                      className="chan__face"
+                    />
+                  )}
+                  <span className="chan__name">{chat.peer!.nick}</span>
+                </button>
+                <button
+                  className="chan__forget"
+                  onClick={() => {
+                    forgetChannel(chat.channelId);
+                    onChanged();
+                  }}
+                  title="Убрать из списка"
+                  type="button"
+                >
+                  ×
+                </button>
+              </div>
+            ))}
+          </div>
+        ) : null}
+
         <div className="sidebar__section">
           <span className="sidebar__label">Голосовые каналы</span>
 

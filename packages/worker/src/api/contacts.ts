@@ -73,6 +73,35 @@ export async function handleContacts(
     return json({ user: publicUser(target), relation: result.relation });
   }
 
+  /**
+   * Переписка с контактом.
+   *
+   * Отдаёт постоянный личный канал пары — тот же самый, в который придёт и
+   * звонок. Заводится он здесь же при первом обращении: держать пустой канал
+   * для каждой пары, которая, может, никогда и не заговорит, незачем.
+   */
+  const chat = /^\/api\/contacts\/([^/]+)\/chat$/.exec(path);
+  if (chat) {
+    const other = decodeURIComponent(chat[1]!);
+
+    // Переписка — для друзей. Иначе достаточно было бы узнать чужой
+    // идентификатор, чтобы написать кому угодно.
+    const link = await friends.between(viewer.id, other);
+    if (link?.status !== "accepted") return json({ error: "not_friends" }, 403);
+
+    const peer = await users.byId(other);
+    if (!peer) return json({ error: "not_found" }, 404);
+
+    const registry = env.REGISTRY.get(env.REGISTRY.idFromName("global"));
+    const { channel, invite } = await registry.directChannel(
+      viewer.id,
+      other,
+      `${viewer.displayName} и ${peer.displayName}`,
+    );
+
+    return json({ channelId: channel.id, code: invite.code, peer: publicUser(peer) });
+  }
+
   const accept = /^\/api\/contacts\/([^/]+)\/accept$/.exec(path);
   if (accept && request.method === "POST") {
     const ok = await friends.accept(viewer.id, decodeURIComponent(accept[1]!));

@@ -71,10 +71,10 @@ export function useVoice() {
   }, [engine]);
 
   const join = useCallback(
-    async (token: string, inputDeviceId?: string) => {
+    async (token: string, inputDeviceId?: string, withVoice = true) => {
       setError(null);
       try {
-        await engine.join({ token, inputDeviceId });
+        await engine.join({ token, inputDeviceId, withVoice });
       } catch (err) {
         setError(describeMicError(err));
         throw err;

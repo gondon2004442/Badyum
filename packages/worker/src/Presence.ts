@@ -274,15 +274,16 @@ export class Presence extends DurableObject<Env> {
     if (!target) return fail("offline");
     if (target.state.call) return fail("busy");
 
-    // Канал под звонок заводит каталог — он же считает лимиты, и личный звонок
-    // не должен быть лазейкой мимо них.
+    // Звонок идёт в постоянный личный канал пары, а не в свежесозданный. Так
+    // разговор продолжает ту же переписку, а не начинается на пустом месте, и в
+    // списке каналов не копятся одноразовые «Аня и Боря» после каждого звонка.
     const registry = this.env.REGISTRY.get(this.env.REGISTRY.idFromName("global"));
-    const created = await registry.createChannelFor(`u:${state.who.userId}`, {
-      name: `${state.who.displayName} и ${target.state.who.displayName}`,
-    });
-    if (!created.ok) return fail("busy");
+    const { invite } = await registry.directChannel(
+      state.who.userId,
+      to,
+      `${state.who.displayName} и ${target.state.who.displayName}`,
+    );
 
-    const invite = await registry.createInvite(created.channel.id);
     const call = { id: callId, code: invite.code };
 
     this.update(ws, { call: { ...call, peerId: to, role: "caller" } });

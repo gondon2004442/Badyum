@@ -41,6 +41,18 @@ async function call<T>(path: string, init?: RequestInit): Promise<T> {
   return (await response.json()) as T;
 }
 
+/**
+ * Открыть переписку с контактом.
+ *
+ * Возвращает постоянный личный канал пары — тот же самый, в который придёт и
+ * звонок. Поэтому переписка и разговор — одно место, а не два.
+ */
+export function openDirect(
+  userId: string,
+): Promise<{ channelId: string; code: string; peer: Account }> {
+  return call(`/api/contacts/${encodeURIComponent(userId)}/chat`);
+}
+
 export interface ContactsState {
   /** Принявшие. Им можно звонить. */
   friends: Contact[];
