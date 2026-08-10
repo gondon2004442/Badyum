@@ -87,21 +87,31 @@ export class MeshEngine implements VoiceEngine {
     this.socket = new SignalingSocket(wsUrl);
   }
 
-  async join({ token, inputDeviceId }: JoinOptions): Promise<void> {
+  async join({ token, inputDeviceId, withVoice = true }: JoinOptions): Promise<void> {
     this.setQuality({ status: "connecting" });
 
-    // Микрофон берём до сигналинга: отказ в правах должен быть виден сразу,
-    // а не после того, как мы уже показались остальным в канале.
-    this.localStream = await captureMicrophone(inputDeviceId);
-    // Глушим дорожку сразу, не дожидаясь первого setMuted: между захватом
-    // микрофона и подключением проходят сотни миллисекунд живого звука.
-    this.applyTrackState();
+    /**
+     * Без голоса — вход только ради переписки.
+     *
+     * Микрофон не запрашиваем и звуковой граф не поднимаем: человек, который
+     * зашёл написать сообщение, не должен видеть запрос разрешения. Соединений
+     * с собеседниками при этом не возникает само собой — createPeer выходит,
+     * пока нет локального потока.
+     */
+    if (withVoice) {
+      // Микрофон берём до сигналинга: отказ в правах должен быть виден сразу,
+      // а не после того, как мы уже показались остальным в канале.
+      this.localStream = await captureMicrophone(inputDeviceId);
+      // Глушим дорожку сразу, не дожидаясь первого setMuted: между захватом
+      // микрофона и подключением проходят сотни миллисекунд живого звука.
+      this.applyTrackState();
 
-    this.context = createAudioContext();
-    await this.context.resume();
-    this.mixer = new Mixer(this.context);
+      this.context = createAudioContext();
+      await this.context.resume();
+      this.mixer = new Mixer(this.context);
 
-    this.attachVad();
+      this.attachVad();
+    }
 
     this.socket.on((msg) => this.handleServerMessage(msg));
 
@@ -270,7 +280,8 @@ export class MeshEngine implements VoiceEngine {
           // peer-соединения не трогаем: медиа идёт напрямую и обрыв сигналинга
           // переживает. А вот с теми, кто вошёл, пока мы были offline, связи
           // нет — их offer ушёл в мёртвый сокет, и инициировать должны мы.
-          if (!this.peers.has(participant.userId)) {
+          // Без микрофона соединяться нечем и незачем: мы зашли переписываться.
+          if (this.localStream && !this.peers.has(participant.userId)) {
             this.createPeer(participant.userId);
           }
         }
@@ -309,7 +320,7 @@ export class MeshEngine implements VoiceEngine {
         const participant = this.participants.get(msg.userId);
         if (participant) participant.hasStream = false;
 
-        this.createPeer(msg.userId);
+        if (this.localStream) this.createPeer(msg.userId);
         this.emitParticipants();
         return;
       }
@@ -324,6 +335,11 @@ export class MeshEngine implements VoiceEngine {
       }
 
       case "signal": {
+        // Зашли переписываться — отвечать на предложение соединения нечем:
+        // микрофона нет. Молча пропускаем, а не падаем: для того, кто читает
+        // чат, чужая попытка соединиться не событие.
+        if (!this.localStream) return;
+
         const peer = this.peers.get(msg.from) ?? this.createPeer(msg.from);
         void peer.acceptSignal(msg.payload);
         return;
@@ -381,8 +397,11 @@ export class MeshEngine implements VoiceEngine {
     const existing = this.peers.get(peerId);
     if (existing) return existing;
 
+    // Оба условия — настоящие ошибки вызывающего, но разные. Без selfId мы не
+    // знаем, кто «вежливый», и перепутали бы порядок предложений. Без потока
+    // нечего передавать: сюда попадают только те, кто зашёл с микрофоном.
     if (!this.selfId || !this.localStream) {
-      throw new Error("createPeer до welcome — этого не должно происходить");
+      throw new Error("createPeer без selfId или микрофона — так звать нельзя");
     }
 
     const peer = new Peer({

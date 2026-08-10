@@ -32,6 +32,14 @@ export interface PresenceState {
   accept: () => void;
   /** Сбросить, отменить, не дождаться — с любой стороны одно и то же. */
   hangUp: () => void;
+  /**
+   * Звонок состоялся, и мы уже в канале — состояние дозвона можно убрать.
+   *
+   * Отдельно от `hangUp`: тот сообщает собеседнику, что разговора не будет.
+   * Здесь ровно наоборот — разговор начался. Без этого «звоню» висело бы
+   * вечно и не давало позвонить второй раз.
+   */
+  clearCall: () => void;
   clearEnd: () => void;
 }
 
@@ -198,6 +206,7 @@ export function usePresence(account: Account | null): PresenceState {
     dial,
     accept,
     hangUp,
+    clearCall: useCallback(() => setCall(null), []),
     clearEnd: useCallback(() => setLastEnd(null), []),
   };
 }

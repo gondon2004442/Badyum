@@ -23,6 +23,8 @@ const MAX_PARTICIPANTS_DEFAULT = 8;
  */
 interface Attached extends Participant {
   channelName: string;
+  /** Исчезает ли канал вместе с последним вышедшим. Берётся из каталога. */
+  ephemeral: boolean;
 }
 
 const toParticipant = (a: Attached): Participant => ({
@@ -174,9 +176,15 @@ export class ChannelRoom extends DurableObject<Env> {
     this.chat.forget(who.userId);
     this.broadcast({ type: "peer_left", userId: who.userId }, who.userId);
 
-    // Эфемерный канал живёт ровно пока в нём кто-то есть. Пустую комнату
-    // чистим целиком: иначе переписка ушедших висела бы в хранилище вечно.
-    if (this.sockets().length === 0) {
+    /**
+     * Эфемерный канал живёт ровно пока в нём кто-то есть: пустую комнату чистим
+     * целиком, иначе переписка случайных встреч висела бы в хранилище вечно.
+     *
+     * Личный канал пары — наоборот. Двое вышли, поговорив, и вернулись завтра:
+     * переписка обязана быть на месте. Стирать её значило бы, что чат с
+     * человеком каждый раз начинается с нуля — а ради него он и открывается.
+     */
+    if (who.ephemeral && this.sockets().length === 0) {
       this.chat.clear(this.channelId());
       void this.ctx.storage.deleteAll();
     }
@@ -369,6 +377,7 @@ export class ChannelRoom extends DurableObject<Env> {
       deafened: previous?.who.deafened ?? false,
       speaking: false,
       channelName: channel.name,
+      ephemeral: channel.ephemeral,
     };
     ws.serializeAttachment(who);
 

@@ -462,3 +462,26 @@
   opacity: 0.6;
   cursor: not-allowed;
 }
+
+/*
+  Аватар и имя — кнопка «открыть переписку», действия справа отдельно.
+  Кликабельна вся строка целиком, а не только имя: попасть в неё с телефона
+  надо не целясь.
+*/
+.contact__open {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex: 1;
+  min-width: 0;
+  padding: 0;
+  background: none;
+  border: none;
+  text-align: left;
+  color: inherit;
+}
+
+/* У заявок переписки ещё нет — строка не нажимается и не притворяется. */
+.contact__open--flat {
+  cursor: default;
+}

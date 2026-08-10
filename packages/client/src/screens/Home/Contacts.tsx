@@ -11,6 +11,8 @@ interface ContactsProps {
   /** Живо ли соединение присутствия: без него статусы врут, и звонить нельзя. */
   connected: boolean;
   onCall: (peer: Caller) => void;
+  /** Нажатие на самого человека — открыть переписку с ним. */
+  onOpen: (peer: Caller) => void;
   /** Идёт звонок — второй начинать не даём. */
   busy: boolean;
 }
@@ -29,7 +31,14 @@ const toCaller = (c: Contact): Caller => ({
  * Заявки стоят выше друзей: на них нужно ответить, а список друзей никуда не
  * денется. Внизу их не заметили бы.
  */
-export function Contacts({ contacts, online, connected, onCall, busy }: ContactsProps) {
+export function Contacts({
+  contacts,
+  online,
+  connected,
+  onCall,
+  onOpen,
+  busy,
+}: ContactsProps) {
   const [handle, setHandle] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [done, setDone] = useState<string | null>(null);
@@ -106,7 +115,7 @@ export function Contacts({ contacts, online, connected, onCall, busy }: Contacts
         {contacts.friends.map((c) => {
           const here = online.has(c.user.id);
           return (
-            <Row key={c.user.id} contact={c} online={here}>
+            <Row key={c.user.id} contact={c} online={here} onOpen={() => onOpen(toCaller(c))}>
               <button
                 className="contacts__call"
                 onClick={() => onCall(toCaller(c))}
@@ -164,14 +173,25 @@ export function Contacts({ contacts, online, connected, onCall, busy }: Contacts
 function Row({
   contact,
   online,
+  onOpen,
   children,
 }: {
   contact: Contact;
   online?: boolean;
+  /** Есть только у друзей: переписка с тем, кто ещё не принял, невозможна. */
+  onOpen?: () => void;
   children: React.ReactNode;
 }) {
+  const Face = onOpen ? "button" : "div";
+
   return (
     <div className="contact">
+      <Face
+        className={`contact__open${onOpen ? "" : " contact__open--flat"}`}
+        onClick={onOpen}
+        title={onOpen ? `Открыть переписку с ${contact.user.nick}` : undefined}
+        type={onOpen ? "button" : undefined}
+      >
       <span className="contact__face">
         {contact.user.avatarUrl ? (
           <img
@@ -197,6 +217,7 @@ function Row({
         <span className="contact__name">{contact.user.nick}</span>
         <span className="contact__tag">#{contact.user.tag}</span>
       </span>
+      </Face>
 
       <span className="contact__acts">{children}</span>
     </div>

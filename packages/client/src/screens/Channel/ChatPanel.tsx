@@ -9,6 +9,10 @@ interface ChatPanelProps {
   onSend: (text: string) => void;
   typing: TypingPeer[];
   onTyping: (typing: boolean) => void;
+  /** «Написать в канал» — не то, что хочется видеть в переписке с человеком. */
+  placeholder?: string;
+  /** Чем встречает пустой чат: у канала и у переписки это разные вещи. */
+  empty?: string;
 }
 
 /**
@@ -48,7 +52,15 @@ function groupsOf(messages: ChatMessage[]): ChatMessage[][] {
 const time = (at: number) =>
   new Date(at).toLocaleTimeString("ru", { hour: "2-digit", minute: "2-digit" });
 
-export function ChatPanel({ messages, selfId, onSend, typing, onTyping }: ChatPanelProps) {
+export function ChatPanel({
+  messages,
+  selfId,
+  onSend,
+  typing,
+  onTyping,
+  placeholder = "Написать в канал",
+  empty = "Здесь можно написать, когда говорить не с руки — скинуть ссылку или ответить, не перебивая.",
+}: ChatPanelProps) {
   const [text, setText] = useState("");
   const listRef = useRef<HTMLDivElement>(null);
   const pinnedRef = useRef(true);
@@ -100,10 +112,7 @@ export function ChatPanel({ messages, selfId, onSend, typing, onTyping }: ChatPa
     <section className="chat">
       <div className="chat__list" ref={listRef}>
         {groups.length === 0 ? (
-          <p className="chat__empty">
-            Здесь можно написать, когда говорить не с руки — скинуть ссылку или
-            ответить, не перебивая.
-          </p>
+          <p className="chat__empty">{empty}</p>
         ) : (
           groups.map((group) => {
             const head = group[0]!;
@@ -140,7 +149,7 @@ export function ChatPanel({ messages, selfId, onSend, typing, onTyping }: ChatPa
           className="chat__input"
           value={text}
           onChange={(e) => onInput(e.target.value)}
-          placeholder="Написать в канал"
+          placeholder={placeholder}
           maxLength={2000}
           aria-label="Сообщение в канал"
         />

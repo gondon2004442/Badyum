@@ -1,5 +1,5 @@
 import { useMemo, useState, type FormEvent } from "react";
-import type { CallEndReason } from "@badyum/shared";
+import type { CallEndReason, Caller } from "@badyum/shared";
 import { loginUrl, nameFor, useAccount } from "../../account.ts";
 import { useContacts } from "../../contacts.ts";
 import type { PresenceState } from "../../presence.ts";
@@ -23,6 +23,7 @@ interface HomeScreenProps {
   busy: boolean;
   error: string | null;
   presence: PresenceState;
+  onOpenDirect: (peer: Caller) => void;
 }
 
 /** Что человек делает на этом экране: зовёт знакомого или идёт в канал. */
@@ -60,6 +61,7 @@ export function HomeScreen({
   busy,
   error,
   presence,
+  onOpenDirect,
 }: HomeScreenProps) {
   const [word, setWord] = useState("");
   const [tick, setTick] = useState(0);
@@ -100,6 +102,7 @@ export function HomeScreen({
         participantCount={0}
         recent={recent}
         onOpenChannel={onOpenChannel}
+        onOpenDirect={onOpenDirect}
         onNewChannel={onNewChannel}
         onChanged={() => setTick((t) => t + 1)}
         account={account.account}
@@ -188,6 +191,7 @@ export function HomeScreen({
               online={presence.online}
               connected={presence.connected}
               onCall={presence.dial}
+              onOpen={onOpenDirect}
               busy={presence.call !== null || busy}
             />
           ) : (
