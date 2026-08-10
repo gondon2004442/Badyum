@@ -4,11 +4,32 @@ import { myName } from "./storage.ts";
 
 export interface Account {
   id: string;
+  /** Юз, по которому находят. `null` — ещё не выбрал: см. UsernameScreen. */
+  username: string | null;
+  /** Ник и тег — прошлый способ адресации. Останутся до чистки схемы. */
   nick: string;
   tag: string;
   displayName: string;
   avatarUrl: string | null;
 }
+
+/**
+ * Как человека зовут на экране.
+ *
+ * Имя из профиля, а не юз: «Максим Иванов» читается, а «dumax» опознаётся.
+ * Имя есть всегда — и у вошедшего от Google, и у гостя, который его ввёл, —
+ * поэтому дыры вместо человека тут не бывает.
+ */
+export const nameOf = (who: { displayName: string }): string => who.displayName;
+
+/**
+ * Юз с собачкой — то, что диктуют, чтобы тебя нашли.
+ *
+ * `null`, пока юз не выбран: показывать одинокую «@» хуже, чем не показывать
+ * ничего, — это читается как сбой, а не как «ещё не заполнено».
+ */
+export const handleOf = (who: { username: string | null }): string | null =>
+  who.username ? `@${who.username}` : null;
 
 interface MeResponse {
   user: Account | null;
@@ -28,6 +49,8 @@ export interface AccountState {
   available: boolean;
   loading: boolean;
   logout: () => Promise<void>;
+  /** Юз выбран — обновляем общий стор, чтобы не перезагружать страницу. */
+  setUsername: (username: string) => void;
 }
 
 /**
@@ -37,7 +60,7 @@ export interface AccountState {
  * считается, и три одинаковых `/api/me` при открытии страницы это чистая
  * растрата. Заодно выход из аккаунта в одном месте виден сразу везде.
  */
-type Snapshot = Omit<AccountState, "logout">;
+type Snapshot = Omit<AccountState, "logout" | "setUsername">;
 
 let snapshot: Snapshot = { account: null, available: false, loading: true };
 const listeners = new Set<() => void>();
@@ -86,7 +109,7 @@ export function loginUrl(): string {
  * второй раз представляться не надо.
  */
 export function nameFor(account: Account | null): string {
-  return myName() || account?.nick || "гость";
+  return myName() || account?.displayName || "гость";
 }
 
 export function useAccount(): AccountState {
@@ -100,5 +123,9 @@ export function useAccount(): AccountState {
     set({ ...snapshot, account: null });
   }, []);
 
-  return { ...state, logout };
+  const setUsername = useCallback((username: string) => {
+    if (snapshot.account) set({ ...snapshot, account: { ...snapshot.account, username } });
+  }, []);
+
+  return { ...state, logout, setUsername };
 }

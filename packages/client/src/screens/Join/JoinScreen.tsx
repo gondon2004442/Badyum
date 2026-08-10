@@ -1,7 +1,7 @@
 import { useEffect, useState, type FormEvent } from "react";
 import { ApiError, previewChannel, requestJoin, type PreviewResponse } from "../../api.ts";
 import { Avatar } from "../../components/Avatar.tsx";
-import { loginUrl, useAccount } from "../../account.ts";
+import { loginUrl, nameOf, useAccount } from "../../account.ts";
 import { GoogleIcon } from "../../components/Icons.tsx";
 import "./Join.css";
 
@@ -41,7 +41,7 @@ export function JoinScreen({ target, onJoined }: JoinScreenProps) {
    * перезаписать им уже набранное имя означало бы стереть слово из-под рук.
    */
   useEffect(() => {
-    if (account) setName((current) => current || account.nick);
+    if (account) setName((current) => current || nameOf(account));
   }, [account]);
 
   useEffect(() => {
@@ -143,7 +143,7 @@ export function JoinScreen({ target, onJoined }: JoinScreenProps) {
         {error ? <p className="join__error">{error}</p> : null}
         <p className="join__note">
           {account
-            ? `Ты вошёл как ${account.nick}#${account.tag}`
+            ? `Ты вошёл как ${nameOf(account)}`
             : mustLogIn
               ? "Заходить по чужой ссылке вход не нужен — только заводить свои комнаты"
               : "Регистрация не нужна — только имя"}

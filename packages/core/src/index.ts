@@ -16,3 +16,4 @@ export * from "./tokens.ts";
 export * from "./rate.ts";
 export * from "./signed.ts";
 export * from "./nick.ts";
+export * from "./username.ts";

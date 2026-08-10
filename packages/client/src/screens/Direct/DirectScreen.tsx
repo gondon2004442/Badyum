@@ -4,6 +4,7 @@ import { Avatar } from "../../components/Avatar.tsx";
 import { ExitIcon, PhoneIcon } from "../../components/Icons.tsx";
 import { ChatPanel } from "../Channel/ChatPanel.tsx";
 import { useVoice } from "../../voice/useVoice.ts";
+import { nameOf } from "../../account.ts";
 import "../Channel/Channel.css";
 import "./Direct.css";
 
@@ -65,13 +66,13 @@ export function DirectScreen({
               referrerPolicy="no-referrer"
             />
           ) : (
-            <Avatar userId={peer.userId} name={peer.nick} className="direct__avatar" />
+            <Avatar userId={peer.userId} name={nameOf(peer)} className="direct__avatar" />
           )}
           <span className={`contact__dot${online ? " contact__dot--on" : ""}`} />
         </span>
 
         <span className="direct__who">
-          <span className="direct__name">{peer.nick}</span>
+          <span className="direct__name">{nameOf(peer)}</span>
           <span className="direct__status">{online ? "в сети" : "не в сети"}</span>
         </span>
 
@@ -79,7 +80,7 @@ export function DirectScreen({
           className="direct__call"
           onClick={onCall}
           disabled={!online || busy}
-          title={online ? `Позвонить ${peer.nick}` : "Не в сети"}
+          title={online ? `Позвонить ${nameOf(peer)}` : "Не в сети"}
           type="button"
         >
           <PhoneIcon size={16} />
@@ -93,8 +94,8 @@ export function DirectScreen({
         onSend={voice.sendChat}
         typing={voice.typing}
         onTyping={voice.setTyping}
-        placeholder={`Написать ${peer.nick}`}
-        empty={`Это переписка с ${peer.nick}. Она никуда не денется между звонками.`}
+        placeholder={`Написать ${nameOf(peer)}`}
+        empty={`Это переписка с ${nameOf(peer)}. Она никуда не денется между звонками.`}
       />
     </div>
   );

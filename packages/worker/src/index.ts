@@ -6,6 +6,7 @@ import { ChannelRoom } from "./ChannelRoom.ts";
 import { Presence } from "./Presence.ts";
 import { Auth } from "./auth.ts";
 import { handleContacts } from "./api/contacts.ts";
+import { handleUsername } from "./api/username.ts";
 import { json } from "./http.ts";
 import type { Env } from "./env.ts";
 
@@ -100,8 +101,7 @@ export default {
 
       const who = {
         userId: viewer.id,
-        nick: viewer.nick,
-        tag: viewer.tag,
+        username: viewer.username,
         displayName: viewer.displayName,
         avatarUrl: viewer.avatarUrl,
       };
@@ -138,6 +138,7 @@ export default {
         user: user
           ? {
               id: user.id,
+              username: user.username,
               nick: user.nick,
               tag: user.tag,
               displayName: user.displayName,
@@ -151,14 +152,17 @@ export default {
     }
 
     /**
-     * Контакты. Вход обязателен — у гостя их и быть не может: он никто, пока
-     * не завёл аккаунт, и звать его в друзья некому.
+     * Контакты и юз. Вход обязателен — у гостя их и быть не может: он никто,
+     * пока не завёл аккаунт, и звать его в друзья некому.
      */
-    if (path.startsWith("/api/contacts")) {
+    if (path.startsWith("/api/contacts") || path.startsWith("/api/username")) {
       const viewer = await new Auth(env).current(request);
       if (!viewer) return json({ error: "auth_required" }, 401);
 
-      const handled = await handleContacts(request, url, env, viewer);
+      const handled = path.startsWith("/api/username")
+        ? await handleUsername(request, url, env, viewer)
+        : await handleContacts(request, url, env, viewer);
+
       if (handled) return handled;
       return json({ error: "not_found" }, 404);
     }

@@ -1,6 +1,6 @@
 import { useMemo, useState, type FormEvent } from "react";
 import type { CallEndReason, Caller } from "@badyum/shared";
-import { loginUrl, nameFor, useAccount } from "../../account.ts";
+import { handleOf, loginUrl, nameFor, nameOf, useAccount } from "../../account.ts";
 import { useContacts } from "../../contacts.ts";
 import type { PresenceState } from "../../presence.ts";
 import { Contacts } from "./Contacts.tsx";
@@ -24,6 +24,7 @@ interface HomeScreenProps {
   error: string | null;
   presence: PresenceState;
   onOpenDirect: (peer: Caller) => void;
+  onChangeUsername: () => void;
 }
 
 /** Что человек делает на этом экране: зовёт знакомого или идёт в канал. */
@@ -62,6 +63,7 @@ export function HomeScreen({
   error,
   presence,
   onOpenDirect,
+  onChangeUsername,
 }: HomeScreenProps) {
   const [word, setWord] = useState("");
   const [tick, setTick] = useState(0);
@@ -109,6 +111,7 @@ export function HomeScreen({
         loginAvailable={account.available}
         onLogout={() => void account.logout()}
         onOpenSettings={() => setTick((t) => t + 1)}
+        onChangeUsername={onChangeUsername}
       />
 
       <main className="home">
@@ -125,12 +128,19 @@ export function HomeScreen({
               <>
                 <Avatar
                   userId={account.account.id}
-                  name={account.account.nick}
+                  name={nameOf(account.account)}
                   className="home__person-avatar"
                 />
                 <span className="home__account-name">
-                  {account.account.nick}
-                  <span className="home__account-tag">#{account.account.tag}</span>
+                  {nameOf(account.account)}
+                  <button
+                    className="home__account-tag home__account-tag--edit"
+                    onClick={onChangeUsername}
+                    title="Сменить юз"
+                    type="button"
+                  >
+                    {handleOf(account.account) ?? "выбрать юз"}
+                  </button>
                 </span>
                 <button
                   className="home__account-out"
@@ -180,7 +190,7 @@ export function HomeScreen({
 
           {presence.lastEnd ? (
             <p className="home__error" onClick={presence.clearEnd}>
-              {presence.lastEnd.peer ? `${presence.lastEnd.peer.nick}: ` : ""}
+              {presence.lastEnd.peer ? `${nameOf(presence.lastEnd.peer)}: ` : ""}
               {ENDINGS[presence.lastEnd.reason]}
             </p>
           ) : null}

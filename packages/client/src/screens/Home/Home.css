@@ -485,3 +485,13 @@
 .contact__open--flat {
   cursor: default;
 }
+
+.home__account-tag--edit {
+  padding: 0;
+  background: none;
+  border: none;
+}
+
+.home__account-tag--edit:hover {
+  color: var(--accent-lime);
+}

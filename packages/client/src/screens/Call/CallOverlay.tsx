@@ -2,6 +2,7 @@ import { useEffect } from "react";
 import { Avatar } from "../../components/Avatar.tsx";
 import { PhoneIcon, PhoneOffIcon } from "../../components/Icons.tsx";
 import { useRinger } from "./ringer.ts";
+import { handleOf, nameOf } from "../../account.ts";
 import type { CallPhase } from "../../presence.ts";
 import "./Call.css";
 
@@ -50,14 +51,16 @@ export function CallOverlay({ call, onAccept, onHangUp }: CallOverlayProps) {
           ) : (
             <Avatar
               userId={call.peer.userId}
-              name={call.peer.nick}
+              name={nameOf(call.peer)}
               className="callscreen__avatar"
             />
           )}
         </span>
 
-        <h1 className="callscreen__name">{call.peer.nick}</h1>
-        <span className="callscreen__tag">#{call.peer.tag}</span>
+        <h1 className="callscreen__name">{nameOf(call.peer)}</h1>
+        {handleOf(call.peer) ? (
+          <span className="callscreen__tag">{handleOf(call.peer)}</span>
+        ) : null}
 
         <div className="callscreen__acts">
           {incoming ? (

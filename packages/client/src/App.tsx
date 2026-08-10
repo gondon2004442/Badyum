@@ -4,6 +4,7 @@ import { JoinScreen, type JoinTarget } from "./screens/Join/JoinScreen.tsx";
 import { DirectScreen } from "./screens/Direct/DirectScreen.tsx";
 import { openDirect } from "./contacts.ts";
 import { CallOverlay } from "./screens/Call/CallOverlay.tsx";
+import { UsernameScreen } from "./screens/Username/UsernameScreen.tsx";
 import { usePresence } from "./presence.ts";
 import { ChannelScreen } from "./screens/Channel/ChannelScreen.tsx";
 import { HomeScreen } from "./screens/Home/HomeScreen.tsx";
@@ -50,7 +51,9 @@ export function App() {
   const [session, setSession] = useState<Session | null>(null);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const { account } = useAccount();
+  const { account, setUsername } = useAccount();
+  /** Открыт ли экран смены юза. Первый выбор открывается сам, см. ниже. */
+  const [changingUsername, setChangingUsername] = useState(false);
   const presence = usePresence(account);
 
   const enter = useCallback((next: Session) => {
@@ -63,8 +66,7 @@ export function App() {
       peer: next.peer
         ? {
             userId: next.peer.userId,
-            nick: next.peer.nick,
-            tag: next.peer.tag,
+            username: next.peer.username,
             displayName: next.peer.displayName,
             avatarUrl: next.peer.avatarUrl,
           }
@@ -188,6 +190,29 @@ export function App() {
   );
 
   /**
+   * Юз не выбран — дальше не пускаем.
+   *
+   * Не придирка: без юза человека нельзя найти и добавить, то есть аккаунт не
+   * делает ровно того, ради чего заводился. Спросить один раз при входе честнее,
+   * чем оставить его невидимым и ждать, пока он сам догадается заглянуть в
+   * настройки. Гостя это не касается вовсе — у него и аккаунта нет.
+   */
+  if (account && (account.username === null || changingUsername)) {
+    return (
+      <UsernameScreen
+        account={account}
+        onDone={(username) => {
+          setUsername(username);
+          setChangingUsername(false);
+        }}
+        // Отступать некуда, пока юза нет вовсе: аккаунт без него не делает
+        // того, ради чего заводился.
+        onCancel={account.username ? () => setChangingUsername(false) : undefined}
+      />
+    );
+  }
+
+  /**
    * Звонок поверх всего, включая разговор в канале.
    *
    * `accepted` не показываем: в этот момент мы уже заходим в канал, и держать
@@ -281,6 +306,7 @@ export function App() {
         error={error}
         presence={presence}
         onOpenDirect={openDirectWith}
+        onChangeUsername={() => setChangingUsername(true)}
       />
     </>
   );
