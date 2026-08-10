@@ -29,7 +29,7 @@ const toLink = (row: Row): Friendship => ({
 
 /** Контакт вместе с человеком: список показывают, а не считают. */
 export interface Contact {
-  user: Pick<User, "id" | "nick" | "tag" | "displayName" | "avatarUrl">;
+  user: Pick<User, "id" | "username" | "nick" | "tag" | "displayName" | "avatarUrl">;
   relation: Relation;
   since: number;
 }
@@ -71,7 +71,7 @@ export class Friends {
     const { results } = await this.db
       .prepare(
         `SELECT f.user_a, f.user_b, f.requested_by, f.status, f.created_at,
-                u.id, u.nick, u.tag, u.display_name, u.avatar_url
+                u.id, u.username, u.nick, u.tag, u.display_name, u.avatar_url
            FROM friendships f
            JOIN users u
              ON u.id = CASE WHEN f.user_a = ?1 THEN f.user_b ELSE f.user_a END
@@ -79,13 +79,23 @@ export class Friends {
           ORDER BY f.created_at DESC`,
       )
       .bind(viewer)
-      .all<Row & { id: string; nick: string; tag: string; display_name: string; avatar_url: string | null }>();
+      .all<
+        Row & {
+          id: string;
+          username: string | null;
+          nick: string;
+          tag: string;
+          display_name: string;
+          avatar_url: string | null;
+        }
+      >();
 
     return results.map((row) => {
       const link = toLink(row);
       return {
         user: {
           id: row.id,
+          username: row.username,
           nick: row.nick,
           tag: row.tag,
           displayName: row.display_name,

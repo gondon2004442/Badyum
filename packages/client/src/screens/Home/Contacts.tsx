@@ -2,6 +2,7 @@ import { useState, type FormEvent } from "react";
 import { Avatar } from "../../components/Avatar.tsx";
 import { PhoneIcon } from "../../components/Icons.tsx";
 import { ContactsError, type Contact, type ContactsState } from "../../contacts.ts";
+import { handleOf, nameOf } from "../../account.ts";
 import type { Caller } from "@badyum/shared";
 
 interface ContactsProps {
@@ -19,8 +20,7 @@ interface ContactsProps {
 
 const toCaller = (c: Contact): Caller => ({
   userId: c.user.id,
-  nick: c.user.nick,
-  tag: c.user.tag,
+  username: c.user.username,
   displayName: c.user.displayName,
   avatarUrl: c.user.avatarUrl,
 });
@@ -74,9 +74,9 @@ export function Contacts({
             setError(null);
             setDone(null);
           }}
-          placeholder="Добавить по нику, например дюма#4821"
-          maxLength={80}
-          aria-label="Ник и тег человека"
+          placeholder="Добавить по юзу, например dumax"
+          maxLength={40}
+          aria-label="Юз человека"
         />
         <button className="home__go" type="submit" disabled={!handle.trim() || sending}>
           +
@@ -124,7 +124,7 @@ export function Contacts({
                   !connected
                     ? "Нет связи с сервером"
                     : here
-                      ? `Позвонить ${c.user.nick}`
+                      ? `Позвонить ${nameOf(c.user)}`
                       : "Не в сети"
                 }
                 type="button"
@@ -145,7 +145,7 @@ export function Contacts({
 
         {contacts.friends.length === 0 ? (
           <p className="sidebar__empty">
-            Пока никого. Спроси у друга его ник с тегом — он написан у него внизу слева.
+            Пока никого. Спроси у друга его юз — он написан у него внизу слева.
           </p>
         ) : null}
       </div>
@@ -189,7 +189,7 @@ function Row({
       <Face
         className={`contact__open${onOpen ? "" : " contact__open--flat"}`}
         onClick={onOpen}
-        title={onOpen ? `Открыть переписку с ${contact.user.nick}` : undefined}
+        title={onOpen ? `Открыть переписку с ${nameOf(contact.user)}` : undefined}
         type={onOpen ? "button" : undefined}
       >
       <span className="contact__face">
@@ -203,7 +203,7 @@ function Row({
         ) : (
           <Avatar
             userId={contact.user.id}
-            name={contact.user.nick}
+            name={nameOf(contact.user)}
             className="contact__avatar"
           />
         )}
@@ -214,8 +214,11 @@ function Row({
       </span>
 
       <span className="contact__who">
-        <span className="contact__name">{contact.user.nick}</span>
-        <span className="contact__tag">#{contact.user.tag}</span>
+        <span className="contact__name">{nameOf(contact.user)}</span>
+        {/* Юза может не быть: человек вошёл, но выбрать ещё не успел. */}
+        {handleOf(contact.user) ? (
+          <span className="contact__tag">{handleOf(contact.user)}</span>
+        ) : null}
       </span>
       </Face>
 

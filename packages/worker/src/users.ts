@@ -1,7 +1,16 @@
-import { generateTag, newUserId, nickFromName } from "@badyum/core";
+import { generateTag, newUserId, nickFromName, usernameKey } from "@badyum/core";
 
 export interface User {
   id: string;
+  /**
+   * Юз, по которому человека находят. `null` — ещё не выбрал.
+   *
+   * Так у всех, кто завёл аккаунт до того, как юзы появились: их кириллические
+   * ники в новые правила не переводятся, а придумывать за человека то, по чему
+   * его будут звать, — не наше дело.
+   */
+  username: string | null;
+  /** Ник и тег — прошлый способ адресации. Оставлены до чистки схемы. */
   nick: string;
   tag: string;
   displayName: string;
@@ -11,6 +20,7 @@ export interface User {
 
 interface Row {
   id: string;
+  username: string | null;
   nick: string;
   tag: string;
   display_name: string;
@@ -20,6 +30,7 @@ interface Row {
 
 const toUser = (row: Row): User => ({
   id: row.id,
+  username: row.username,
   nick: row.nick,
   tag: row.tag,
   displayName: row.display_name,
@@ -55,7 +66,47 @@ export class Users {
     return row ? toUser(row) : null;
   }
 
-  /** Поиск «кто такой дюма#4821». */
+  /**
+   * Поиск «кто такой dumax».
+   *
+   * По нижнему регистру: человек, которому продиктовали юз, наберёт его как
+   * услышал, и «Dumax» должен находиться по «dumax».
+   */
+  async byUsername(username: string): Promise<User | null> {
+    const row = await this.db
+      .prepare("SELECT * FROM users WHERE lower(username) = ?")
+      .bind(usernameKey(username))
+      .first<Row>();
+    return row ? toUser(row) : null;
+  }
+
+  /**
+   * Занять юз.
+   *
+   * Проверять «свободен ли» отдельным запросом и потом писать — гонка: между
+   * проверкой и записью его успевает занять другой. Поэтому пишем сразу и
+   * полагаемся на уникальный индекс, а «занято» узнаём из его отказа.
+   */
+  async setUsername(
+    id: string,
+    username: string,
+  ): Promise<{ ok: true; user: User } | { ok: false; error: "taken" | "not_found" }> {
+    try {
+      await this.db
+        .prepare("UPDATE users SET username = ? WHERE id = ?")
+        .bind(username, id)
+        .run();
+    } catch {
+      // Разбирать текст ошибки D1 не станем: он не часть контракта и меняется
+      // между версиями. Нарушить здесь можно ровно одно ограничение.
+      return { ok: false, error: "taken" };
+    }
+
+    const user = await this.byId(id);
+    return user ? { ok: true, user } : { ok: false, error: "not_found" };
+  }
+
+  /** Поиск «кто такой дюма#4821» — прошлый способ, до чистки схемы. */
   async byNick(nick: string, tag: string): Promise<User | null> {
     const row = await this.db
       .prepare("SELECT * FROM users WHERE nick = ? AND tag = ?")
@@ -104,6 +155,9 @@ export class Users {
 
         return {
           id,
+          // Юз человек выберет сам при первом входе: подставлять за него то,
+          // по чему его будут звать, — не наше дело.
+          username: null,
           nick,
           tag,
           displayName: profile.name,

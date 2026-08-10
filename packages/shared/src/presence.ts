@@ -13,11 +13,16 @@ import { z } from "zod";
  * каждый запрос считается.
  */
 
-/** Кто участвует в звонке — ровно то, что нужно нарисовать на экране вызова. */
+/**
+ * Кто участвует в звонке — ровно то, что нужно нарисовать на экране вызова.
+ *
+ * `username` может быть `null`: человек завёл аккаунт, но юз ещё не выбрал.
+ * Тогда показывается имя из профиля — звонок не повод отказываться его
+ * показывать.
+ */
 export const callerSchema = z.object({
   userId: z.string(),
-  nick: z.string(),
-  tag: z.string(),
+  username: z.string().nullable(),
   displayName: z.string(),
   avatarUrl: z.string().nullable(),
 });

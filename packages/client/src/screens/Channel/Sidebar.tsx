@@ -8,7 +8,7 @@ import {
 import { Avatar } from "../../components/Avatar.tsx";
 import type { Caller } from "@badyum/shared";
 import { forgetChannel, type RecentChannel } from "../../storage.ts";
-import { loginUrl, type Account } from "../../account.ts";
+import { handleOf, loginUrl, nameOf, type Account } from "../../account.ts";
 
 interface SidebarProps {
   /** null — мы не в канале: сайдбар тот же, активной строки просто нет. */
@@ -24,6 +24,8 @@ interface SidebarProps {
   onNewChannel: () => void;
   onChanged: () => void;
   onOpenSettings: () => void;
+  /** Сменить юз. Необязателен: из канала за этим не ходят. */
+  onChangeUsername?: () => void;
   /** Аккаунт, если человек вошёл. Гость — null, и это нормальный режим. */
   account: Account | null;
   /** Настроен ли вход. Кнопку, которая не сработает, показывать нельзя. */
@@ -50,6 +52,7 @@ export function Sidebar({
   onNewChannel,
   onChanged,
   onOpenSettings,
+  onChangeUsername,
   account,
   loginAvailable,
   onLogout,
@@ -84,7 +87,7 @@ export function Sidebar({
                 <button
                   className="chan__open"
                   onClick={() => onOpenDirect(chat.peer!)}
-                  title={`Переписка с ${chat.peer!.nick}`}
+                  title={`Переписка с ${nameOf(chat.peer!)}`}
                   type="button"
                 >
                   {chat.peer!.avatarUrl ? (
@@ -97,11 +100,11 @@ export function Sidebar({
                   ) : (
                     <Avatar
                       userId={chat.peer!.userId}
-                      name={chat.peer!.nick}
+                      name={nameOf(chat.peer!)}
                       className="chan__face"
                     />
                   )}
-                  <span className="chan__name">{chat.peer!.nick}</span>
+                  <span className="chan__name">{nameOf(chat.peer!)}</span>
                 </button>
                 <button
                   className="chan__forget"
@@ -206,26 +209,28 @@ export function Sidebar({
           // вошедшего под ником dumax в квадрате оставалось «ГО» от гостя.
           <Avatar
             userId={account?.id ?? selfIdentity}
-            name={account?.nick ?? selfName}
+            name={account ? nameOf(account) : selfName}
             className="sidebar__avatar"
           />
         )}
         <div className="sidebar__identity">
-          <span className="sidebar__myname">{account?.nick ?? selfName}</span>
+          <span className="sidebar__myname">{account ? nameOf(account) : selfName}</span>
           <span className="sidebar__mytag">
             {/*
               У гостя тег — обрезок локального идентификатора: он ничего не
               подтверждает и живёт только в этом браузере. У вошедшего — настоящий,
               выданный сервисом, и по нему человека можно найти.
             */}
-            #{account?.tag ?? selfIdentity.slice(0, 4)}
+            {account
+              ? (handleOf(account) ?? "юз не выбран")
+              : `#${selfIdentity.slice(0, 4)}`}
           </span>
         </div>
         {account ? (
           <button
             className="sidebar__gear"
             onClick={onLogout}
-            title={`Выйти из аккаунта ${account.nick}#${account.tag}`}
+            title={`Выйти из аккаунта ${nameOf(account)}`}
             type="button"
           >
             <ExitIcon size={16} />

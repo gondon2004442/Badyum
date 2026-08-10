@@ -79,8 +79,7 @@ export interface RecentChannel {
    */
   peer?: {
     userId: string;
-    nick: string;
-    tag: string;
+    username: string | null;
     displayName: string;
     avatarUrl: string | null;
   };

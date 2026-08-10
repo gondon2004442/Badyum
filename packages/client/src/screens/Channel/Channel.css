@@ -1386,3 +1386,17 @@
   object-fit: cover;
   border-color: var(--border-strong);
 }
+
+/* Юз нажимается, чтобы его сменить — но выглядит как подпись, а не как кнопка:
+   это подпись, которая умеет ещё и открываться. */
+.sidebar__mytag--edit {
+  padding: 0;
+  background: none;
+  border: none;
+  text-align: left;
+  color: var(--text-muted);
+}
+
+.sidebar__mytag--edit:hover {
+  color: var(--accent-lime);
+}
