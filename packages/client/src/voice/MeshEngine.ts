@@ -18,7 +18,8 @@ import { Peer } from "./peer.ts";
 import { SignalingSocket } from "./signalingSocket.ts";
 import { Mixer } from "./audio/mixer.ts";
 import { createVad, type VadHandle } from "./audio/vad.ts";
-import { captureMicrophone, createAudioContext } from "./audio/devices.ts";
+import { createAudioContext } from "./audio/devices.ts";
+import { createMicPipeline, type MicPipeline } from "./audio/micPipeline.ts";
 
 const STATS_INTERVAL_MS = 3000;
 
@@ -35,8 +36,18 @@ export class MeshEngine implements VoiceEngine {
 
   private context: AudioContext | null = null;
   private mixer: Mixer | null = null;
+  /**
+   * Исходящий тракт целиком. `localStream` — его выход, тот самый поток,
+   * который уходит собеседникам; при включённом шумодаве это уже не микрофон.
+   */
+  private mic: MicPipeline | null = null;
   private localStream: MediaStream | null = null;
   private vad: VadHandle | null = null;
+
+  /** Что нужно, чтобы пересобрать тракт на ходу: устройство и шумодав. */
+  private inputDeviceId: string | undefined;
+  private denoisePref = true;
+  private denoised = false;
 
   private selfId: string | null = null;
   private readonly peers = new Map<string, Peer>();
@@ -87,8 +98,15 @@ export class MeshEngine implements VoiceEngine {
     this.socket = new SignalingSocket(wsUrl);
   }
 
-  async join({ token, inputDeviceId, withVoice = true }: JoinOptions): Promise<void> {
+  async join({
+    token,
+    inputDeviceId,
+    withVoice = true,
+    denoise = true,
+  }: JoinOptions): Promise<void> {
     this.setQuality({ status: "connecting" });
+    this.inputDeviceId = inputDeviceId;
+    this.denoisePref = denoise;
 
     /**
      * Без голоса — вход только ради переписки.
@@ -99,15 +117,22 @@ export class MeshEngine implements VoiceEngine {
      * пока нет локального потока.
      */
     if (withVoice) {
+      // Контекст поднимаем первым, а не после микрофона, как было раньше: на
+      // iOS resume() обязан случиться внутри пользовательского жеста, и каждый
+      // await до него — это шанс, что жест уже «протух». Заодно шумодаву нужен
+      // готовый контекст, чтобы зарегистрировать в нём worklet.
+      this.context = createAudioContext();
+      await this.context.resume();
+
       // Микрофон берём до сигналинга: отказ в правах должен быть виден сразу,
       // а не после того, как мы уже показались остальным в канале.
-      this.localStream = await captureMicrophone(inputDeviceId);
+      this.mic = await createMicPipeline(this.context, inputDeviceId, denoise);
+      this.localStream = this.mic.stream;
+      this.denoised = this.mic.denoised;
       // Глушим дорожку сразу, не дожидаясь первого setMuted: между захватом
       // микрофона и подключением проходят сотни миллисекунд живого звука.
       this.applyTrackState();
 
-      this.context = createAudioContext();
-      await this.context.resume();
       this.mixer = new Mixer(this.context);
 
       this.attachVad();
@@ -147,8 +172,14 @@ export class MeshEngine implements VoiceEngine {
     this.mixer?.destroy();
     this.mixer = null;
 
-    for (const track of this.localStream?.getTracks() ?? []) track.stop();
+    // Отпускает и микрофон, и всё, что стоит за ним в графе. Останавливать
+    // дорожки localStream напрямую было бы недостаточно: при включённом
+    // шумодаве это выход MediaStreamDestination, а не сам микрофон, и
+    // индикатор записи в браузере горел бы после выхода из канала.
+    this.mic?.stop();
+    this.mic = null;
     this.localStream = null;
+    this.denoised = false;
 
     await this.context?.close();
     this.context = null;
@@ -188,24 +219,52 @@ export class MeshEngine implements VoiceEngine {
   }
 
   async setInputDevice(deviceId: string): Promise<void> {
-    const next = await captureMicrophone(deviceId);
-    const nextTrack = next.getAudioTracks()[0];
-    if (!nextTrack) return;
+    // Пустая строка в списке — это «по умолчанию», а не устройство с пустым id.
+    this.inputDeviceId = deviceId || undefined;
+    await this.rebuildMic();
+  }
 
-    // Меняем трек в живых соединениях через replaceTrack: пересогласование
-    // здесь означало бы разрыв звука у всех разом.
-    await Promise.all(
-      [...this.peers.values()].map((peer) => peer.replaceAudioTrack(nextTrack)),
+  async setDenoise(on: boolean): Promise<void> {
+    if (this.denoisePref === on) return;
+    this.denoisePref = on;
+    await this.rebuildMic();
+  }
+
+  /**
+   * Пересобрать исходящий тракт, не разрывая разговор.
+   *
+   * Смена микрофона и переключение шумодава делают одно и то же: на выходе
+   * появляется новая дорожка. Отдаём её живым соединениям через replaceTrack —
+   * пересогласование здесь означало бы разрыв звука у всех разом.
+   *
+   * Новый тракт собираем до того, как трогаем старый: если микрофон занят или
+   * wasm не отдался, разговор должен продолжиться на том, что уже работает.
+   */
+  private async rebuildMic(): Promise<void> {
+    // Зашли переписываться — тракта нет вовсе, и пересобирать нечего.
+    if (!this.context) return;
+
+    const next = await createMicPipeline(
+      this.context,
+      this.inputDeviceId,
+      this.denoisePref,
     );
 
-    const oldStream = this.localStream;
-    this.localStream = next;
+    await Promise.all(
+      [...this.peers.values()].map((peer) => peer.replaceAudioTrack(next.track)),
+    );
+
+    const previous = this.mic;
+    this.mic = next;
+    this.localStream = next.stream;
+    this.denoised = next.denoised;
     this.applyTrackState();
 
     this.vad?.stop();
     this.attachVad();
 
-    for (const track of oldStream?.getTracks() ?? []) track.stop();
+    previous?.stop();
+    this.emitSelf();
   }
 
   setParticipantVolume(userId: string, volume: number): void {
@@ -234,10 +293,12 @@ export class MeshEngine implements VoiceEngine {
   }
 
   private attachVad(): void {
-    if (!this.context || !this.localStream) return;
+    if (!this.context || !this.mic) return;
 
-    const source = this.context.createMediaStreamSource(this.localStream);
-    this.vad = createVad(this.context, source, (speaking) => {
+    // Слушаем выход тракта, а не микрофон: кольцо должно загораться от того,
+    // что слышат остальные. Мьют при этом граф не глушит — он выключает только
+    // исходящую дорожку, — поэтому «говорит» ниже считается с оглядкой на него.
+    this.vad = createVad(this.context, this.mic.analysis, (speaking) => {
       // Замьюченный не может «говорить»: иначе у остальных горит кольцо
       // человека, которого они не слышат.
       const effective = speaking && !this.muted && this.transmitting;
@@ -581,6 +642,7 @@ export class MeshEngine implements VoiceEngine {
       deafened: this.deafened,
       speaking: this.speaking,
       transmitting: this.transmitting,
+      denoised: this.denoised,
     };
   }
 

@@ -1,12 +1,18 @@
 import { useEffect, useState, type FormEvent } from "react";
 import { listInputDevices, type AudioDevice } from "../../voice/audio/devices.ts";
-import { rememberMyName } from "../../storage.ts";
+import { denoiseEnabled, rememberDenoise, rememberMyName } from "../../storage.ts";
 
 interface SettingsPanelProps {
   selfName: string;
   onClose: () => void;
   onRename: (name: string) => void;
   onPickDevice: (deviceId: string) => Promise<void>;
+  /**
+   * Работает ли шумодав на самом деле — это ответ движка, а не то, что выбрано
+   * в этой панели. Расхождение бывает: wasm мог не загрузиться.
+   */
+  denoised: boolean;
+  onDenoise: (on: boolean) => Promise<void>;
 }
 
 const DEVICE_KEY = "badyum:input-device";
@@ -24,11 +30,16 @@ export function SettingsPanel({
   onClose,
   onRename,
   onPickDevice,
+  denoised,
+  onDenoise,
 }: SettingsPanelProps) {
   const [name, setName] = useState(selfName);
   const [devices, setDevices] = useState<AudioDevice[]>([]);
   const [device, setDevice] = useState(() => localStorage.getItem(DEVICE_KEY) ?? "");
   const [note, setNote] = useState<string | null>(null);
+  const [denoise, setDenoise] = useState(denoiseEnabled);
+  /** Переключение пересобирает тракт: пока идёт, второй клик только навредит. */
+  const [switching, setSwitching] = useState(false);
 
   useEffect(() => {
     // Названия устройств браузер отдаёт только после доступа к микрофону —
@@ -54,6 +65,23 @@ export function SettingsPanel({
       setNote("Микрофон переключён");
     } catch {
       setNote("Не удалось переключить микрофон");
+    }
+  };
+
+  const toggleDenoise = async () => {
+    const next = !denoise;
+    setSwitching(true);
+    // Запоминаем выбор сразу: он должен пережить этот разговор, даже если
+    // пересборка тракта прямо сейчас не удалась.
+    setDenoise(next);
+    rememberDenoise(next);
+    try {
+      await onDenoise(next);
+      setNote(next ? "Шумодав включён" : "Шумодав выключен");
+    } catch {
+      setNote("Не удалось переключить шумодав — микрофон занят?");
+    } finally {
+      setSwitching(false);
     }
   };
 
@@ -113,6 +141,37 @@ export function SettingsPanel({
           {devices.length === 0
             ? "Устройства не найдены"
             : "Переключится в текущем разговоре, без разрыва"}
+        </p>
+      </div>
+
+      <div className="settings__group">
+        <span className="settings__label">Шумодав</span>
+        <button
+          className={`settings__toggle${denoise ? " settings__toggle--on" : ""}`}
+          onClick={() => void toggleDenoise()}
+          disabled={switching}
+          role="switch"
+          aria-checked={denoise}
+          type="button"
+        >
+          <span className="settings__knob" />
+          <span className="settings__toggle-text">
+            {denoise ? "Включён" : "Выключен"}
+          </span>
+        </button>
+        <p className="settings__hint">
+          {/*
+            Три разных состояния, и путать их нельзя. «Не поднялся» — это не
+            «выключен»: человек нажал, а работает браузерная обработка, и знать
+            об этом он должен, иначе будет считать, что шумодав не помогает.
+          */}
+          {!denoise
+            ? "Кулер, клавиатура и телевизор уходят собеседникам как есть"
+            : denoised
+              ? "Убирает шум и во время речи, не только в паузах"
+              : switching
+                ? "Включаю…"
+                : "Не поднялся — остаётся обработка браузера"}
         </p>
       </div>
 

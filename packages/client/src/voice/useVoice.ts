@@ -28,6 +28,7 @@ export function useVoice() {
     deafened: false,
     speaking: false,
     transmitting: true,
+    denoised: false,
   });
   const [quality, setQuality] = useState<ConnectionQuality>({
     status: "idle",
@@ -71,10 +72,10 @@ export function useVoice() {
   }, [engine]);
 
   const join = useCallback(
-    async (token: string, inputDeviceId?: string, withVoice = true) => {
+    async (token: string, inputDeviceId?: string, withVoice = true, denoise = true) => {
       setError(null);
       try {
-        await engine.join({ token, inputDeviceId, withVoice });
+        await engine.join({ token, inputDeviceId, withVoice, denoise });
       } catch (err) {
         setError(describeMicError(err));
         throw err;
@@ -102,6 +103,7 @@ export function useVoice() {
       (deviceId: string) => engine.setInputDevice(deviceId),
       [engine],
     ),
+    setDenoise: useCallback((on: boolean) => engine.setDenoise(on), [engine]),
     setParticipantVolume: useCallback(
       (userId: string, volume: number) => engine.setParticipantVolume(userId, volume),
       [engine],

@@ -20,7 +20,23 @@ export class InsecureContextError extends Error {
   }
 }
 
-export async function captureMicrophone(deviceId?: string): Promise<MediaStream> {
+export interface CaptureOptions {
+  /**
+   * Браузерный шумодав.
+   *
+   * Выключаем ровно в одном случае: когда дальше в тракте стоит свой, RNNoise.
+   * Два шумодава подряд — не «чище вдвое»: браузерный срезает стационарный шум
+   * и отдаёт сети сигнал, на котором её не учили, и голос становится
+   * металлическим. В тракте должен быть ровно один. Эхоподавление и AGC — это
+   * другая работа, они остаются включёнными всегда.
+   */
+  noiseSuppression?: boolean;
+}
+
+export async function captureMicrophone(
+  deviceId?: string,
+  { noiseSuppression = true }: CaptureOptions = {},
+): Promise<MediaStream> {
   if (!navigator.mediaDevices?.getUserMedia) {
     throw new InsecureContextError();
   }
@@ -29,7 +45,7 @@ export async function captureMicrophone(deviceId?: string): Promise<MediaStream>
     audio: {
       deviceId: deviceId ? { exact: deviceId } : undefined,
       echoCancellation: true,
-      noiseSuppression: true,
+      noiseSuppression,
       autoGainControl: true,
       channelCount: 1,
       sampleRate: 48000,

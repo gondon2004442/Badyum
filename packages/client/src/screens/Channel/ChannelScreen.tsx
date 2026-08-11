@@ -19,6 +19,7 @@ import { PeoplePanel } from "./PeoplePanel.tsx";
 import { SettingsPanel, savedInputDevice } from "./SettingsPanel.tsx";
 import { globalPushToTalkKey, isDesktop, onGlobalPushToTalk } from "../../desktop.ts";
 import {
+  denoiseEnabled,
   knownPeople,
   myIdentityId,
   recentChannels,
@@ -128,7 +129,9 @@ export function ChannelScreen({
   }, [voice.participants, channelName]);
 
   useEffect(() => {
-    void voice.join(token, savedInputDevice()).then(() => setJoined(true));
+    void voice.join(token, savedInputDevice(), true, denoiseEnabled()).then(() =>
+      setJoined(true),
+    );
     // Токен одноразовый: повторный join по нему невозможен и не нужен.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [token]);
@@ -203,6 +206,8 @@ export function ChannelScreen({
             setMyName(name);
           }}
           onPickDevice={voice.setInputDevice}
+          denoised={voice.self.denoised}
+          onDenoise={voice.setDenoise}
         />
       ) : null}
 
