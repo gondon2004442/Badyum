@@ -9,6 +9,7 @@ const KEY_IDENTITY = "badyum:identity";
 const KEY_NAME = "badyum:name";
 const KEY_CHANNELS = "badyum:channels";
 const KEY_PEOPLE = "badyum:people";
+const KEY_DENOISE = "badyum:denoise";
 
 const RECENT_CHANNELS_LIMIT = 12;
 const RECENT_PEOPLE_LIMIT = 40;
@@ -149,4 +150,21 @@ export function forgetPerson(identityId: string): void {
     KEY_PEOPLE,
     knownPeople().filter((p) => p.identityId !== identityId),
   );
+}
+
+/**
+ * Шумодав: включён, пока явно не выключили.
+ *
+ * По умолчанию «да» намеренно. Основной сценарий — говорить во время игры, а
+ * там в микрофон летят кулер, механическая клавиатура и комната; человек,
+ * который об этом не думал, должен звучать чисто без единой настройки. Выключить
+ * есть чем — переключатель в настройках, и он же нужен тому, у кого шумодав
+ * съедает процессор.
+ */
+export function denoiseEnabled(): boolean {
+  return read<boolean>(KEY_DENOISE, true);
+}
+
+export function rememberDenoise(on: boolean): void {
+  write(KEY_DENOISE, on);
 }
