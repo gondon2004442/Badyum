@@ -66,15 +66,44 @@ export const signalPayloadSchema = z.union([
 ]);
 export type SignalPayload = z.infer<typeof signalPayloadSchema>;
 
-/** Сообщение в канале. */
-export const chatMessageSchema = z.object({
-  id: z.string(),
-  userId: userIdSchema,
-  displayName: z.string().min(1).max(32),
-  text: z.string().min(1).max(2000),
-  /** Unix-время в миллисекундах. */
-  at: z.number(),
+/**
+ * Файл, приложенный к сообщению.
+ *
+ * `mime` и `kind` проставляет сервер по сигнатуре файла, а не по тому, что
+ * сказал клиент: присланному типу верить нельзя. Ширина и высота — наоборот,
+ * от клиента, но они ни на что не влияют кроме вёрстки: место под картинку
+ * резервируется заранее, чтобы переписка не прыгала при загрузке.
+ */
+export const attachmentSchema = z.object({
+  id: z.string().min(1).max(80),
+  name: z.string().min(1).max(120),
+  size: z.number().int().positive(),
+  kind: z.enum(["image", "file"]),
+  mime: z.string().max(80),
+  width: z.number().int().positive().optional(),
+  height: z.number().int().positive().optional(),
 });
+export type Attachment = z.infer<typeof attachmentSchema>;
+
+/**
+ * Сообщение в канале.
+ *
+ * Текст может быть пустым, но только вместе с вложением: картинка без подписи
+ * — обычное сообщение, а пустое сообщение без всего — нет.
+ */
+export const chatMessageSchema = z
+  .object({
+    id: z.string(),
+    userId: userIdSchema,
+    displayName: z.string().min(1).max(32),
+    text: z.string().max(2000),
+    attachment: attachmentSchema.optional(),
+    /** Unix-время в миллисекундах. */
+    at: z.number(),
+  })
+  .refine((m) => m.text.length > 0 || m.attachment !== undefined, {
+    message: "сообщение без текста и без вложения пустое",
+  });
 export type ChatMessage = z.infer<typeof chatMessageSchema>;
 
 /** Сколько последних сообщений канал помнит и отдаёт вошедшему. */
@@ -104,7 +133,14 @@ export const clientMessageSchema = z.discriminatedUnion("type", [
   }),
   z.object({
     type: z.literal("chat_send"),
-    text: z.string().min(1).max(2000),
+    text: z.string().max(2000),
+    /**
+     * Файл уже лежит в хранилище: клиент загрузил его отдельным запросом и
+     * прислал сюда описание. Через WebSocket байты не гоняем — на бесплатном
+     * плане каждое сообщение сокета считается запросом, а картинку пришлось бы
+     * резать на сотни кусков.
+     */
+    attachment: attachmentSchema.optional(),
   }),
   /**
    * Сменить имя, не выходя из канала.

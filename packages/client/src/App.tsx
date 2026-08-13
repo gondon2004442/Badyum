@@ -248,6 +248,7 @@ export function App() {
         <DirectScreen
           key={session.channelId}
           token={session.token}
+          channelId={session.channelId}
           peer={session.peer}
           online={presence.online.has(session.peer.userId)}
           onCall={() => presence.dial(session.peer!)}

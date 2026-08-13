@@ -8,6 +8,7 @@ import { Auth } from "./auth.ts";
 import { handleContacts } from "./api/contacts.ts";
 import { handleUsername } from "./api/username.ts";
 import { handleReport } from "./api/report.ts";
+import { handleFile, handleUpload } from "./api/files.ts";
 import { json } from "./http.ts";
 import type { Env } from "./env.ts";
 
@@ -167,6 +168,16 @@ export default {
       if (handled) return handled;
       return json({ error: "not_found" }, 404);
     }
+
+    /**
+     * Вложения в переписке.
+     *
+     * Загрузка требует токена канала — того же, которым открывают WebSocket.
+     * Отдача не требует ничего: идентификатор случаен, и сама ссылка на файл
+     * и есть ключ к нему, ровно как у приглашения.
+     */
+    if (path === "/api/upload") return handleUpload(request, env);
+    if (path.startsWith("/api/file/")) return handleFile(url, env);
 
     /**
      * Жалоба клиента на собственную поломку.

@@ -1,6 +1,8 @@
 import {
+  ATTACHMENT_MAX_BYTES,
   TYPING_REFRESH_MS,
   TYPING_TTL_MS,
+  type Attachment,
   type ChatMessage,
   type Participant,
   type SignalPayload,
@@ -20,6 +22,8 @@ import { Mixer } from "./audio/mixer.ts";
 import { createVad, type VadHandle } from "./audio/vad.ts";
 import { createAudioContext } from "./audio/devices.ts";
 import { createMicPipeline, type MicPipeline } from "./audio/micPipeline.ts";
+import { apiOrigin } from "../api.ts";
+import { UploadError } from "./uploadError.ts";
 
 const STATS_INTERVAL_MS = 3000;
 
@@ -613,10 +617,50 @@ export class MeshEngine implements VoiceEngine {
     for (const cb of this.typingSubs) cb(list);
   }
 
-  sendChat(text: string): void {
+  sendChat(text: string, attachment?: Attachment): void {
     const trimmed = text.trim();
-    if (!trimmed) return;
-    this.socket.send({ type: "chat_send", text: trimmed.slice(0, 2000) });
+    // Картинка без подписи — обычное сообщение; пустое без всего — нет.
+    if (!trimmed && !attachment) return;
+    this.socket.send({
+      type: "chat_send",
+      text: trimmed.slice(0, 2000),
+      ...(attachment ? { attachment } : {}),
+    });
+  }
+
+  /**
+   * Положить файл в хранилище.
+   *
+   * Обычный HTTP мимо сокета: на бесплатном плане каждое сообщение WebSocket
+   * считается запросом, и картинку пришлось бы резать на сотни кусков.
+   *
+   * Право — тот же токен канала, которым открыт сокет. Пока его нет, мы ещё
+   * не представились каналу, и загружать некуда.
+   */
+  async uploadFile(file: File, size?: { width: number; height: number }): Promise<Attachment> {
+    if (file.size > ATTACHMENT_MAX_BYTES) throw new UploadError("too_big");
+
+    const token = this.socket.currentToken();
+    if (!token) throw new UploadError("not_joined");
+
+    const params = new URLSearchParams({ token, name: file.name });
+    if (size) {
+      params.set("w", String(size.width));
+      params.set("h", String(size.height));
+    }
+
+    const response = await fetch(`${apiOrigin()}/api/upload?${params}`, {
+      method: "POST",
+      body: file,
+    });
+
+    if (!response.ok) {
+      const body = (await response.json().catch(() => ({}))) as { error?: string };
+      throw new UploadError(body.error ?? "failed");
+    }
+
+    const body = (await response.json()) as { attachment: Attachment };
+    return body.attachment;
   }
 
   onChat(cb: (m: ChatMessage[]) => void): Unsub {

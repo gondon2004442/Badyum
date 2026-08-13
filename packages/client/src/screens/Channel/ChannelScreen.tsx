@@ -384,6 +384,8 @@ export function ChannelScreen({
             onSend={voice.sendChat}
             typing={voice.typing}
             onTyping={voice.setTyping}
+            onUpload={voice.uploadFile}
+            channelId={channelId}
           />
         ) : (
           <PeoplePanel

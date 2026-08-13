@@ -121,6 +121,17 @@ export class SignalingSocket {
     this.pendingToken = token;
   }
 
+  /**
+   * Токен, которым мы сейчас представляемся каналу.
+   *
+   * Нужен загрузке вложений: она идёт обычным HTTP мимо сокета, но право на
+   * неё то же самое — «я в этом канале». Отдельный токен ради этого выдавать
+   * незачем, а без права ручка складывала бы в бакет что угодно кто угодно.
+   */
+  currentToken(): string | null {
+    return this.pendingToken;
+  }
+
   onConnectionState(listener: (online: boolean) => void): () => void {
     this.stateSubs.add(listener);
     return () => this.stateSubs.delete(listener);

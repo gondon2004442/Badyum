@@ -1027,6 +1027,189 @@
   cursor: not-allowed;
 }
 
+/* --- Вложения --- */
+
+/* Текст и файл в одном сообщении идут столбиком, а не в строку. */
+.msg__row {
+  display: flex;
+  flex-direction: column;
+  /*
+    Без этого колоночный flex растягивает детей на всю ширину по умолчанию, и
+    картинка 200×200 превращалась в полосу во всю панель: коробка широкая, а
+    сама картинка вписана в неё с полями по бокам.
+  */
+  align-items: flex-start;
+  gap: 5px;
+}
+
+.msg__row + .msg__row {
+  margin-top: 4px;
+}
+
+.att {
+  display: inline-flex;
+  max-width: 100%;
+  border-radius: var(--radius-md);
+  text-decoration: none;
+  color: inherit;
+}
+
+/*
+  Картинка ограничена и по ширине, и по высоте. Без потолка по высоте
+  вертикальный скриншот занимает всю панель, и переписки под ним не видно.
+*/
+.att--image {
+  overflow: hidden;
+  border: 1px solid var(--border-subtle);
+  line-height: 0;
+}
+
+.att--image:hover {
+  border-color: var(--accent-lime);
+}
+
+.att__img {
+  max-width: 100%;
+  max-height: 260px;
+  width: auto;
+  height: auto;
+  object-fit: contain;
+  /* Пока картинка не пришла, место под неё уже занято её же пропорциями. */
+  background: var(--bg-base);
+}
+
+.att--file {
+  align-items: center;
+  max-width: 100%;
+  gap: 9px;
+  padding: 9px 12px;
+  background: var(--bg-surface);
+  border: 1px solid var(--border-subtle);
+}
+
+.att--file:hover {
+  border-color: var(--accent-lime);
+}
+
+.att__icon {
+  color: var(--accent-lime);
+  flex-shrink: 0;
+}
+
+.att__name {
+  font-size: 12.5px;
+  font-weight: 600;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.att__size {
+  font-family: var(--font-mono);
+  font-size: 10px;
+  color: var(--text-muted);
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+
+/* --- Приложить файл --- */
+
+/* Настоящий <input type="file"> уродлив и неуправляем: прячем, жмём скрепку. */
+.chat__file {
+  display: none;
+}
+
+.chat__clip {
+  width: 38px;
+  border-radius: var(--radius-md);
+  background: var(--bg-base);
+  border: 1px solid var(--border-subtle);
+  color: var(--text-muted);
+  flex-shrink: 0;
+}
+
+.chat__clip:hover:not(:disabled) {
+  color: var(--accent-lime);
+  border-color: var(--accent-lime);
+}
+
+.chat__clip:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+/* Файл держат над панелью — показываем, что бросать можно сюда. */
+.chat__compose--drop {
+  background: var(--bg-surface);
+  border-top-color: var(--accent-lime);
+}
+
+/* Выбранный, но ещё не отправленный файл. */
+.chat__pending {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  margin: 0 12px;
+  padding: 7px 9px;
+  border-radius: var(--radius-md);
+  background: var(--bg-surface);
+  border: 1px solid var(--border-subtle);
+  flex-shrink: 0;
+}
+
+.chat__pending-img {
+  width: 34px;
+  height: 34px;
+  border-radius: var(--radius-sm);
+  object-fit: cover;
+  flex-shrink: 0;
+}
+
+.chat__pending-icon {
+  color: var(--accent-lime);
+  flex-shrink: 0;
+}
+
+.chat__pending-name {
+  flex: 1;
+  min-width: 0;
+  font-size: 12.5px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.chat__pending-size {
+  font-family: var(--font-mono);
+  font-size: 10px;
+  color: var(--text-muted);
+  flex-shrink: 0;
+}
+
+.chat__pending-drop {
+  width: 22px;
+  height: 22px;
+  border-radius: var(--radius-sm);
+  background: none;
+  color: var(--text-muted);
+  font-size: 15px;
+  flex-shrink: 0;
+}
+
+.chat__pending-drop:hover:not(:disabled) {
+  color: var(--status-danger);
+}
+
+.chat__problem {
+  margin: 0 12px 6px;
+  padding: 7px 9px;
+  border-radius: var(--radius-md);
+  background: var(--bg-surface);
+  font-size: 11.5px;
+  color: var(--status-danger);
+  flex-shrink: 0;
+}
+
 /* --- Люди --- */
 
 .people {
