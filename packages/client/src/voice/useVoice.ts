@@ -64,7 +64,17 @@ export function useVoice() {
   // Уходя со страницы, выходим из канала явно — иначе остальные несколько
   // секунд видят аватар человека, которого уже нет.
   useEffect(() => {
-    const onUnload = () => void engine.leave();
+    const onUnload = (event: PageTransitionEvent) => {
+      /*
+        `persisted` означает, что страница не закрылась, а уехала в кэш и
+        вернётся живой. На телефоне это происходит от безобидных вещей: свернул
+        браузер, открыл галерею, переключил приложение. Выходить из канала в
+        такой момент нельзя — человек возвращается и обнаруживает, что его из
+        разговора выкинуло, хотя он никуда не уходил.
+      */
+      if (event.persisted) return;
+      void engine.leave();
+    };
     window.addEventListener("pagehide", onUnload);
     return () => {
       window.removeEventListener("pagehide", onUnload);
