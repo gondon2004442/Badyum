@@ -4,8 +4,9 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "release": "pnpm --filter @badyum/client build && wrangler deploy",
-    "dev:worker": "pnpm --filter @badyum/client build && wrangler dev",
+    "//release": "Установка идёт первой намеренно: выкладка почти всегда следует за git pull, а после него на диске нет зависимостей, появившихся в чужом коммите. Без этой строки сборка падает на «Cannot find module» — и выглядит как поломка кода, а не как забытая команда. Стоит секунды, когда ставить нечего.",
+    "release": "pnpm install && pnpm --filter @badyum/client build && wrangler deploy",
+    "dev:worker": "pnpm install && pnpm --filter @badyum/client build && wrangler dev",
     "typecheck": "tsc --noEmit",
     "build": "tsc --noEmit"
   },
