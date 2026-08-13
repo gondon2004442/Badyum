@@ -22,6 +22,7 @@ import { Mixer } from "./audio/mixer.ts";
 import { createVad, type VadHandle } from "./audio/vad.ts";
 import { createAudioContext } from "./audio/devices.ts";
 import { createMicPipeline, type MicPipeline } from "./audio/micPipeline.ts";
+import { keepAwake, type WakeHandle } from "./audio/wake.ts";
 import { apiOrigin } from "../api.ts";
 import { UploadError } from "./uploadError.ts";
 
@@ -45,6 +46,14 @@ export class MeshEngine implements VoiceEngine {
    * который уходит собеседникам; при включённом шумодаве это уже не микрофон.
    */
   private mic: MicPipeline | null = null;
+  /**
+   * Сторож аудиоконтекста.
+   *
+   * Браузер на телефоне усыпляет контекст, стоит вкладке уйти в фон — например,
+   * когда открывают галерею, чтобы приложить картинку. Сам он не просыпается, а
+   * через него идёт весь звук: и входящий, и исходящий.
+   */
+  private wake: WakeHandle | null = null;
   private localStream: MediaStream | null = null;
   private vad: VadHandle | null = null;
 
@@ -127,6 +136,7 @@ export class MeshEngine implements VoiceEngine {
       // готовый контекст, чтобы зарегистрировать в нём worklet.
       this.context = createAudioContext();
       await this.context.resume();
+      this.wake = keepAwake(this.context);
 
       // Микрофон берём до сигналинга: отказ в правах должен быть виден сразу,
       // а не после того, как мы уже показались остальным в канале.
@@ -169,6 +179,9 @@ export class MeshEngine implements VoiceEngine {
     this.participants.clear();
     this.messages = [];
     this.emitChat();
+
+    this.wake?.stop();
+    this.wake = null;
 
     this.vad?.stop();
     this.vad = null;
