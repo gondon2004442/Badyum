@@ -1,5 +1,25 @@
+import { execSync } from "node:child_process";
 import { defineConfig } from "vite";
 import react from "@vitejs/plugin-react";
+
+/**
+ * Какая это сборка. Уходит в сообщения о поломках.
+ *
+ * Без него журнал ошибок бесполезен: непонятно, пришла жалоба со свежей версии
+ * или у человека в браузере лежит вчерашняя из кэша. Коммит подходит лучше
+ * времени сборки — по нему сразу видно, вошло исправление или нет; время
+ * остаётся запасным вариантом там, где git недоступен (образ Docker, чужая
+ * копия репозитория без истории).
+ */
+const BUILD_ID = (() => {
+  try {
+    return execSync("git rev-parse --short HEAD", { stdio: ["ignore", "pipe", "ignore"] })
+      .toString()
+      .trim();
+  } catch {
+    return new Date().toISOString().slice(0, 16);
+  }
+})();
 
 /**
  * Домены туннелей, через которые проверяют звонок с телефона и с друзьями.
@@ -40,6 +60,9 @@ const PROXY = {
 
 export default defineConfig({
   plugins: [react()],
+  define: {
+    __BADYUM_BUILD__: JSON.stringify(BUILD_ID),
+  },
   server: {
     // Слушаем все интерфейсы: телефон проверяется с той же машины по локальному
     // IP, а не через localhost.

@@ -10,6 +10,7 @@ import type {
 } from "./VoiceEngine.ts";
 import { wsUrl } from "../api.ts";
 import { InsecureContextError } from "./audio/devices.ts";
+import { report } from "../report.ts";
 
 
 /**
@@ -118,6 +119,18 @@ export function useVoice() {
  * а именно так выглядит открытие страницы по локальному IP.
  */
 function describeMicError(error: unknown): string {
+  /*
+    Отказ в правах и отсутствующий микрофон — не поломки, а нормальные ответы
+    железа и человека, и слать их значит утопить журнал в шуме. Всё остальное
+    на этом месте — неожиданность, и именно её мы никогда не видим: она
+    случается на чужом телефоне и заканчивается фразой «не работает».
+  */
+  const expected =
+    error instanceof InsecureContextError ||
+    (error instanceof DOMException &&
+      ["NotAllowedError", "NotFoundError"].includes(error.name));
+  if (!expected) report("mic", error);
+
   if (error instanceof InsecureContextError) {
     return "Браузер отдаёт микрофон только по https или на localhost. По локальному IP это невозможно — открой через https-туннель.";
   }

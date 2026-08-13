@@ -3,6 +3,7 @@ import {
   ChannelGate,
   ChannelStore,
   pairOf,
+  RateLimiter,
   type Channel,
   type ChannelSink,
   type Creator,
@@ -31,6 +32,17 @@ const CHANNELS_PER_HOUR = 20;
 const HOUR_MS = 60 * 60 * 1000;
 
 /**
+ * Сколько сообщений о поломках принимаем с одного адреса за час.
+ *
+ * Клиент и сам себя ограничивает — шлёт каждую ошибку однажды и не больше
+ * горстки за вкладку, — но на его сдержанность полагаться нельзя: ручка
+ * открыта без входа, а на бесплатном плане суточный лимит запросов общий на
+ * всех. Тридцати хватает даже вкладке, у которой всё разваливается; циклу в
+ * консоли — нет.
+ */
+const REPORTS_PER_HOUR = 30;
+
+/**
  * Каталог каналов и инвайтов, переживающий перезапуск.
  *
  * Экземпляр один на весь сервис. Это сделано ради корректности, а не из
@@ -54,6 +66,15 @@ export class Registry extends DurableObject {
   private readonly gate: ChannelGate;
   /** Пара → её личный канал. Держим в памяти, зеркалим в хранилище. */
   private readonly direct = new Map<string, string>();
+  /**
+   * Частота сообщений о поломках, по адресу.
+   *
+   * Живёт здесь, а не рядом с ручкой, по той же причине, что и каталог: Worker
+   * поднимается на каждый запрос заново и считать в нём нечем. Счётчик в
+   * памяти и не переживает засыпание — цена промаха всего лишь ещё тридцать
+   * записей в журнале.
+   */
+  private readonly reports = new RateLimiter(REPORTS_PER_HOUR, HOUR_MS);
 
   constructor(ctx: DurableObjectState, env: unknown) {
     super(ctx, env as never);
@@ -186,6 +207,11 @@ export class Registry extends DurableObject {
   }
 
   /** Для /api/health: сколько всего лежит в каталоге. */
+  /** Принять ли ещё одно сообщение о поломке с этого адреса. */
+  allowReport(key: string): boolean {
+    return this.reports.allow(key);
+  }
+
   counts(): { channels: number; invites: number } {
     const snapshot = this.store.snapshot();
     return { channels: snapshot.channels.length, invites: snapshot.invites.length };

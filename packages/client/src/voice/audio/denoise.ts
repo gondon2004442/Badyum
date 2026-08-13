@@ -11,6 +11,7 @@
  * Грузится лениво и отдельным чанком: ~150 КБ wasm не должны попадать в первую
  * загрузку страницы тому, кто зашёл прочитать переписку.
  */
+import { report } from "../../report.ts";
 import rnnoiseWorkletUrl from "@sapphi-red/web-noise-suppressor/rnnoiseWorklet.js?url";
 import rnnoiseWasmUrl from "@sapphi-red/web-noise-suppressor/rnnoise.wasm?url";
 import rnnoiseSimdWasmUrl from "@sapphi-red/web-noise-suppressor/rnnoise_simd.wasm?url";
@@ -67,6 +68,10 @@ export async function createDenoiseNode(context: AudioContext): Promise<DenoiseN
     return new RnnoiseWorkletNode(context, { wasmBinary: wasm, maxChannels: 2 });
   } catch (error) {
     console.warn("[badyum] шумодав не поднялся, остаётся браузерный", error);
+    // Человек этого не заметит — звук пойдёт с браузерной обработкой, — но нам
+    // знать надо: молчаливая деградация у всех сразу выглядит как «шумодав не
+    // помогает», и без этой строки причину искали бы в модели.
+    report("denoise", error);
     // Неудачную загрузку не кэшируем: следующая попытка должна быть честной.
     binary = null;
     return null;
