@@ -34,6 +34,7 @@ const toParticipant = (a: Attached): Participant => ({
   muted: a.muted,
   deafened: a.deafened,
   speaking: a.speaking,
+  sharing: a.sharing,
 });
 
 /**
@@ -241,6 +242,7 @@ export class ChannelRoom extends DurableObject<Env> {
           muted: msg.muted ?? who.muted,
           deafened: msg.deafened ?? who.deafened,
           speaking: msg.speaking ?? who.speaking,
+          sharing: msg.sharing ?? who.sharing,
         };
         // Оглохший не может говорить, замьюченный не может «говорить»: иначе у
         // остальных горит кольцо человека, которого они не слышат.
@@ -254,6 +256,7 @@ export class ChannelRoom extends DurableObject<Env> {
             userId: next.userId,
             muted: next.muted,
             deafened: next.deafened,
+            sharing: next.sharing,
             speaking: next.speaking,
           },
           next.userId,
@@ -377,6 +380,7 @@ export class ChannelRoom extends DurableObject<Env> {
       muted: previous?.who.muted ?? true,
       deafened: previous?.who.deafened ?? false,
       speaking: false,
+      sharing: false,
       channelName: channel.name,
       ephemeral: channel.ephemeral,
     };

@@ -59,6 +59,7 @@ export function attachSignaling(
     muted: m.muted,
     deafened: m.deafened,
     speaking: m.speaking,
+    sharing: m.sharing,
   });
 
   const dropSession = (session: Session): void => {
@@ -151,6 +152,7 @@ export function attachSignaling(
             muted: true,
             deafened: false,
             speaking: false,
+            sharing: false,
           });
           if (!result.ok) {
             return send(socket, {
@@ -219,6 +221,7 @@ export function attachSignaling(
             muted: true,
             deafened: false,
             speaking: false,
+            sharing: false,
           };
           broadcast(channel.id, { type: "peer_joined", participant: self }, claims.userId);
         }

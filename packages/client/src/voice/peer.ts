@@ -9,7 +9,11 @@ const ICE_GRACE_MS = 3000;
 
 interface PeerCallbacks {
   sendSignal: (payload: SignalPayload) => void;
-  onTrack: (stream: MediaStream) => void;
+  /**
+   * Дорожка передаётся вместе с потоком: по её виду вызывающий решает, звук
+   * это или демонстрация экрана. Раньше поток был один и разбирать было нечего.
+   */
+  onTrack: (stream: MediaStream, track: MediaStreamTrack) => void;
   onStateChange: (state: RTCPeerConnectionState) => void;
 }
 
@@ -43,6 +47,13 @@ export class Peer {
   private queue: Promise<void> = Promise.resolve();
   /** Выдержка перед ICE restart в состоянии disconnected. */
   private iceGraceTimer: ReturnType<typeof setTimeout> | null = null;
+  /**
+   * Отправители демонстрации экрана — те, что завели мы.
+   *
+   * Держим списком, а не ищем по виду дорожки: у экрана бывает своя звуковая
+   * дорожка, и от микрофонной она ничем не отличается, кроме нашей памяти.
+   */
+  private screenSenders: RTCRtpSender[] = [];
 
   constructor(opts: {
     selfId: string;
@@ -105,9 +116,9 @@ export class Peer {
       });
     };
 
-    this.pc.ontrack = ({ streams }) => {
+    this.pc.ontrack = ({ streams, track }) => {
       const stream = streams[0];
-      if (stream) this.cb.onTrack(stream);
+      if (stream) this.cb.onTrack(stream, track);
     };
 
     this.pc.onconnectionstatechange = () => {
@@ -218,6 +229,61 @@ export class Peer {
     if (sender) await sender.replaceTrack(track);
   }
 
+  /**
+   * Начать отдавать этому собеседнику экран.
+   *
+   * Здесь именно addTrack и пересогласование, а не replaceTrack: видеодорожки
+   * в соединении до сих пор не было вовсе, и подменять нечего. Пересогласование
+   * запустит onnegotiationneeded, а perfect negotiation разберётся, даже если
+   * двое нажали «показать» одновременно.
+   */
+  async addScreen(stream: MediaStream, maxBitrate: number): Promise<void> {
+    if (this.closed) return;
+
+    // Повторный вызов без снятия предыдущего дал бы вторую видеодорожку в том
+    // же соединении, и собеседник увидел бы два экрана.
+    this.stopScreen();
+
+    for (const track of stream.getTracks()) {
+      const sender = this.pc.addTrack(track, stream);
+      this.screenSenders.push(sender);
+      if (track.kind === "video") await tuneVideo(sender, maxBitrate);
+    }
+  }
+
+  /**
+   * Перестать показывать.
+   *
+   * Убираем ровно тех отправителей, которых сами и завели. Искать их по виду
+   * дорожки было бы неверно: у экрана бывает своя звуковая дорожка, и она
+   * неотличима от микрофонной ничем, кроме того, что мы помним её сами.
+   */
+  stopScreen(): void {
+    if (this.closed) return;
+
+    for (const sender of this.screenSenders) {
+      try {
+        this.pc.removeTrack(sender);
+      } catch {
+        // Соединение могло уйти из-под ног между решением и действием.
+      }
+    }
+    this.screenSenders = [];
+  }
+
+  /**
+   * Пересчитать потолок битрейта.
+   *
+   * В mesh каждый зритель получает свою копию потока, и исходящий канал делится
+   * между ними. Вошёл третий — потолок каждому надо опустить, иначе upstream
+   * домашнего интернета кончается и сыпется уже не картинка, а голос.
+   */
+  async setScreenBitrate(maxBitrate: number): Promise<void> {
+    if (this.closed) return;
+    const sender = this.screenSenders.find((s) => s.track?.kind === "video");
+    if (sender) await tuneVideo(sender, maxBitrate);
+  }
+
   /** Статистика для индикатора качества. Врать зелёным индикатором нельзя. */
   async readStats(): Promise<{ rttMs: number | null; packetLoss: number | null; relayed: boolean }> {
     if (this.closed) return { rttMs: null, packetLoss: null, relayed: false };
@@ -295,4 +361,31 @@ function withOpusTuning(sdp: string | undefined): string | undefined {
     `a=rtpmap:${opusPayload} opus/48000`,
     `a=rtpmap:${opusPayload} opus/48000\r\na=fmtp:${opusPayload} ${tuning}`,
   );
+}
+
+/**
+ * Потолок битрейта для видео.
+ *
+ * Без него браузер разгоняется до нескольких мегабит на каждого зрителя, а в
+ * mesh каждый зритель получает свою копию: домашний upstream кончается, и
+ * первым сыпется не картинка, а голос — он идёт по тому же каналу.
+ *
+ * `contentHint = "motion"` — под игру: при нехватке канала браузер пожертвует
+ * чёткостью, но сохранит плавность. Для показа текста было бы наоборот.
+ */
+async function tuneVideo(sender: RTCRtpSender, maxBitrate: number): Promise<void> {
+  if (sender.track) sender.track.contentHint = "motion";
+
+  const parameters = sender.getParameters();
+  // Пустой encodings встречается до первого пересогласования — тогда правку
+  // применит следующий вызов, уже после установки описания.
+  if (!parameters.encodings?.length) parameters.encodings = [{}];
+  parameters.encodings[0]!.maxBitrate = maxBitrate;
+
+  try {
+    await sender.setParameters(parameters);
+  } catch (error) {
+    // Не критично: без потолка картинка просто жаднее к каналу.
+    console.warn("[peer] не удалось ограничить битрейт видео", error);
+  }
 }

@@ -37,6 +37,14 @@ export const participantSchema = z.object({
   deafened: z.boolean(),
   /** Говорит прямо сейчас. Считается локально самим участником, см. audio/vad. */
   speaking: z.boolean(),
+  /**
+   * Показывает экран.
+   *
+   * Флаг нужен отдельно от самого потока: видео доезжает через пересогласование
+   * и не мгновенно, а интерфейс должен показать «сейчас будет» сразу — иначе
+   * секунду-другую человек видит пустоту и решает, что не сработало.
+   */
+  sharing: z.boolean(),
 });
 export type Participant = z.infer<typeof participantSchema>;
 
@@ -130,6 +138,7 @@ export const clientMessageSchema = z.discriminatedUnion("type", [
     muted: z.boolean().optional(),
     deafened: z.boolean().optional(),
     speaking: z.boolean().optional(),
+    sharing: z.boolean().optional(),
   }),
   z.object({
     type: z.literal("chat_send"),
@@ -233,6 +242,7 @@ export const serverMessageSchema = z.discriminatedUnion("type", [
     muted: z.boolean().optional(),
     deafened: z.boolean().optional(),
     speaking: z.boolean().optional(),
+    sharing: z.boolean().optional(),
   }),
   z.object({ type: z.literal("chat_message"), message: chatMessageSchema }),
   z.object({

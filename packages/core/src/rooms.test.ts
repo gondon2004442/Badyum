@@ -11,6 +11,7 @@ const member = (userId: string, channelId = "ch1"): Member => ({
   muted: false,
   deafened: false,
   speaking: false,
+  sharing: false,
 });
 
 describe("состояние комнаты", () => {
