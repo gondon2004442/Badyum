@@ -10,6 +10,8 @@ import "./Direct.css";
 
 interface DirectScreenProps {
   token: string;
+  /** Канал переписки: он же часть ключа, по которому лежат вложения. */
+  channelId: string;
   peer: Caller;
   /** В сети ли собеседник: без этого звонить некому. */
   online: boolean;
@@ -32,6 +34,7 @@ interface DirectScreenProps {
  */
 export function DirectScreen({
   token,
+  channelId,
   peer,
   online,
   onCall,
@@ -94,6 +97,8 @@ export function DirectScreen({
         onSend={voice.sendChat}
         typing={voice.typing}
         onTyping={voice.setTyping}
+        onUpload={voice.uploadFile}
+        channelId={channelId}
         placeholder={`Написать ${nameOf(peer)}`}
         empty={`Это переписка с ${nameOf(peer)}. Она никуда не денется между звонками.`}
       />

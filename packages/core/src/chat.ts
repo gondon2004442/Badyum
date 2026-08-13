@@ -1,4 +1,4 @@
-import { CHAT_HISTORY_LIMIT, type ChatMessage } from "@badyum/shared";
+import { CHAT_HISTORY_LIMIT, type Attachment, type ChatMessage } from "@badyum/shared";
 import { RateLimiter } from "./rate.ts";
 
 /** Не чаще стольких сообщений за окно — иначе один человек забивает канал. */
@@ -45,6 +45,7 @@ export class ChatLog {
     channelId: string,
     sender: Sender,
     rawText: string,
+    attachment?: Attachment,
   ): { ok: true; message: ChatMessage } | { ok: false; error: "too_fast" | "empty" } {
     const text = rawText
       // Управляющие символы, кроме перевода строки: он в сообщении осмыслен.
@@ -53,7 +54,8 @@ export class ChatLog {
       .trim()
       .slice(0, 2000);
 
-    if (!text) return { ok: false, error: "empty" };
+    // Картинка без подписи — обычное сообщение, а пустое без всего — нет.
+    if (!text && !attachment) return { ok: false, error: "empty" };
     if (!this.limiter.allow(sender.userId)) return { ok: false, error: "too_fast" };
 
     const message: ChatMessage = {
@@ -61,6 +63,7 @@ export class ChatLog {
       userId: sender.userId,
       displayName: sender.displayName,
       text,
+      ...(attachment ? { attachment } : {}),
       at: Date.now(),
     };
 

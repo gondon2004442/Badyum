@@ -1,4 +1,4 @@
-import type { ChatMessage, Participant } from "@badyum/shared";
+import type { Attachment, ChatMessage, Participant } from "@badyum/shared";
 
 export type Unsub = () => void;
 
@@ -109,7 +109,16 @@ export interface VoiceEngine {
    * Живёт здесь, а не в компоненте: сообщения приходят по тому же сокету, что
    * и состав комнаты, и должны переживать переподключение вместе с ним.
    */
-  sendChat(text: string): void;
+  /** Отправить сообщение. Текст может быть пустым, если есть вложение. */
+  sendChat(text: string, attachment?: Attachment): void;
+  /**
+   * Положить файл в хранилище и получить его описание.
+   *
+   * Загрузка живёт в движке, а не в компоненте, по тому же правилу, что и всё
+   * остальное: экран не знает про транспорт. Заодно только движок и знает
+   * токен, которым мы представляемся каналу.
+   */
+  uploadFile(file: File, size?: { width: number; height: number }): Promise<Attachment>;
   onChat(cb: (messages: ChatMessage[]) => void): Unsub;
 
   /** «Печатает…»: флаг, а не событие на нажатие — см. протокол. */

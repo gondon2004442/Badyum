@@ -278,6 +278,7 @@ export class ChannelRoom extends DurableObject<Env> {
           this.channelId(),
           { userId: who.userId, displayName: who.displayName },
           msg.text,
+          msg.attachment,
         );
         if (!result.ok) {
           if (result.error === "too_fast") {

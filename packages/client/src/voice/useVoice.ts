@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { MeshEngine } from "./MeshEngine.ts";
-import type { ChatMessage } from "@badyum/shared";
+import type { Attachment, ChatMessage } from "@badyum/shared";
 import type {
   ConnectionQuality,
   SelfState,
@@ -97,7 +97,15 @@ export function useVoice() {
     setMuted: useCallback((m: boolean) => engine.setMuted(m), [engine]),
     setDeafened: useCallback((d: boolean) => engine.setDeafened(d), [engine]),
     setTransmitting: useCallback((t: boolean) => engine.setTransmitting(t), [engine]),
-    sendChat: useCallback((text: string) => engine.sendChat(text), [engine]),
+    sendChat: useCallback(
+      (text: string, attachment?: Attachment) => engine.sendChat(text, attachment),
+      [engine],
+    ),
+    uploadFile: useCallback(
+      (file: File, size?: { width: number; height: number }) =>
+        engine.uploadFile(file, size),
+      [engine],
+    ),
     setTyping: useCallback((on: boolean) => engine.setTyping(on), [engine]),
     rename: useCallback((name: string) => engine.rename(name), [engine]),
     setInputDevice: useCallback(
