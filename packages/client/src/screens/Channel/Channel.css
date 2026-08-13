@@ -1292,13 +1292,24 @@
   flex-shrink: 0;
 }
 
-.lightbox__img {
+/*
+  Место вокруг картинки — это и есть «фон», по которому закрывают кликом.
+  Раньше картинка занимала всю ширину, и закрыть мимо было физически негде.
+*/
+.lightbox__area {
   flex: 1;
   min-height: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0 10px 10px;
+}
+
+.lightbox__img {
+  max-width: 100%;
+  max-height: 100%;
   /* contain, а не cover: рассматривают картинку целиком, а не её середину. */
   object-fit: contain;
-  width: 100%;
-  padding: 0 10px 10px;
 }
 
 /* --- Приложить файл --- */
