@@ -1062,6 +1062,10 @@
   overflow: hidden;
   border: 1px solid var(--border-subtle);
   line-height: 0;
+  /* Теперь это <button>: сбрасываем всё, что браузер даёт кнопке по умолчанию. */
+  padding: 0;
+  background: none;
+  cursor: zoom-in;
 }
 
 .att--image:hover {
@@ -1110,6 +1114,85 @@
   color: var(--text-muted);
   white-space: nowrap;
   flex-shrink: 0;
+}
+
+/* --- Просмотр картинки поверх приложения --- */
+
+/*
+  Именно наложение, а не отдельная вкладка. Уход со страницы на телефоне стоил
+  человеку канала: браузер выгружал вкладку, возврат означал свежую загрузку
+  приложения. Здесь страница остаётся той же, сокет живой, звук идёт.
+*/
+.lightbox {
+  position: fixed;
+  inset: 0;
+  z-index: 60;
+  display: flex;
+  flex-direction: column;
+  /*
+    Глухой чёрный, а не полупрозрачный: на тёмном интерфейсе даже 8% просвета
+    читаются как «чат виден сквозь картинку», и рассматривать мешает и то, и
+    другое. Плюс чёрный — привычный фон любого просмотра фотографий.
+  */
+  background: #000;
+  padding-top: var(--safe-top);
+  padding-bottom: var(--safe-bottom);
+}
+
+.lightbox__bar {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 12px 14px;
+  flex-shrink: 0;
+}
+
+.lightbox__name {
+  flex: 1;
+  min-width: 0;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text-primary);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.lightbox__size {
+  font-family: var(--font-mono);
+  font-size: 10px;
+  color: var(--text-muted);
+  white-space: nowrap;
+}
+
+.lightbox__open {
+  font-size: 12px;
+  color: var(--accent-lime);
+  text-decoration: none;
+  white-space: nowrap;
+}
+
+.lightbox__close {
+  display: grid;
+  place-items: center;
+  /* 40 px — минимум, в который попадают пальцем не целясь. */
+  width: 40px;
+  height: 40px;
+  border-radius: var(--radius-md);
+  background: var(--bg-surface);
+  color: var(--text-primary);
+  font-size: 22px;
+  line-height: 1;
+  flex-shrink: 0;
+}
+
+.lightbox__img {
+  flex: 1;
+  min-height: 0;
+  /* contain, а не cover: рассматривают картинку целиком, а не её середину. */
+  object-fit: contain;
+  width: 100%;
+  padding: 0 10px 10px;
 }
 
 /* --- Приложить файл --- */

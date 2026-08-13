@@ -1,6 +1,8 @@
+import { useState } from "react";
 import { formatBytes, type Attachment } from "@badyum/shared";
 import { ClipIcon } from "../../components/Icons.tsx";
 import { apiOrigin } from "../../api.ts";
+import { Lightbox } from "./Lightbox.tsx";
 
 /** Куда браузеру идти за файлом. Канал в пути — часть ключа, а не украшение. */
 export const fileUrl = (channelId: string, id: string): string =>
@@ -20,16 +22,26 @@ interface AttachmentViewProps {
  */
 export function AttachmentView({ attachment, channelId }: AttachmentViewProps) {
   const href = fileUrl(channelId, attachment.id);
+  const [open, setOpen] = useState(false);
 
   if (attachment.kind === "image") {
     return (
-      <a
-        className="att att--image"
-        href={href}
-        target="_blank"
-        rel="noreferrer noopener"
-        title={`${attachment.name} · ${formatBytes(attachment.size)}`}
-      >
+      <>
+        {open ? (
+          <Lightbox attachment={attachment} src={href} onClose={() => setOpen(false)} />
+        ) : null}
+
+        {/*
+          Кнопка, а не ссылка. Ссылка уводила со страницы, и на телефоне это
+          стоило человеку канала: браузер выгружал вкладку, возврат означал
+          свежую загрузку приложения. Смотреть скриншот не должно стоить звонка.
+        */}
+        <button
+          className="att att--image"
+          onClick={() => setOpen(true)}
+          title={`${attachment.name} · ${formatBytes(attachment.size)}`}
+          type="button"
+        >
         <img
           className="att__img"
           src={href}
@@ -44,7 +56,8 @@ export function AttachmentView({ attachment, channelId }: AttachmentViewProps) {
           loading="lazy"
           decoding="async"
         />
-      </a>
+        </button>
+      </>
     );
   }
 
