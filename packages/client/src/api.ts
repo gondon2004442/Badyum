@@ -49,6 +49,17 @@ export function publicOrigin(): string {
   return SERVER_ORIGIN || location.origin;
 }
 
+/**
+ * Куда обращаться за API. Пустая строка означает «относительный путь».
+ *
+ * Отличается от publicOrigin: там нужен адрес, который можно кому-то
+ * отправить, а здесь — тот, по которому ходит эта вкладка. Подставлять
+ * `location.origin` нельзя, в десктопной обёртке это `tauri://localhost`.
+ */
+export function apiOrigin(): string {
+  return SERVER_ORIGIN;
+}
+
 async function request<T>(path: string, init?: RequestInit): Promise<T> {
   const response = await fetch(`${SERVER_ORIGIN}${path}`, {
     ...init,

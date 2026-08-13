@@ -7,6 +7,7 @@ import { Presence } from "./Presence.ts";
 import { Auth } from "./auth.ts";
 import { handleContacts } from "./api/contacts.ts";
 import { handleUsername } from "./api/username.ts";
+import { handleReport } from "./api/report.ts";
 import { json } from "./http.ts";
 import type { Env } from "./env.ts";
 
@@ -165,6 +166,17 @@ export default {
 
       if (handled) return handled;
       return json({ error: "not_found" }, 404);
+    }
+
+    /**
+     * Жалоба клиента на собственную поломку.
+     *
+     * Без входа намеренно: самые интересные ошибки случаются как раз до него.
+     * Кто вошёл — того подписываем, чтобы отличать «у одного» от «у всех».
+     */
+    if (path === "/api/report") {
+      const user = await new Auth(env).current(request).catch(() => null);
+      return handleReport(request, env, registryOf(env), user?.id ?? null);
     }
 
     if (path === "/api/health") {
