@@ -1,4 +1,7 @@
 import type { Attachment, ChatMessage, Participant } from "@badyum/shared";
+import type { ScreenShare } from "./MeshEngine.ts";
+
+export type { ScreenShare };
 
 export type Unsub = () => void;
 
@@ -46,6 +49,8 @@ export interface SelfState {
    * именно это поле, иначе он обещал бы чистый звук, которого нет.
    */
   denoised: boolean;
+  /** Показываем ли экран прямо сейчас. */
+  sharing: boolean;
 }
 
 export interface JoinOptions {
@@ -102,6 +107,19 @@ export interface VoiceEngine {
   setDenoise(on: boolean): Promise<void>;
   /** Локальная громкость конкретного участника, 0..2. */
   setParticipantVolume(userId: string, volume: number): void;
+
+  /**
+   * Демонстрация экрана.
+   *
+   * Живёт в движке по тому же правилу, что и всё медиа: экран — это ещё одна
+   * дорожка в тех же соединениях, и компонент про них знать не должен. Начало
+   * показа открывает системный диалог выбора окна, поэтому звать можно только
+   * из обработчика нажатия.
+   */
+  startScreenShare(): Promise<void>;
+  stopScreenShare(): Promise<void>;
+  /** Чужие экраны. Их может быть несколько: запрета показывать вдвоём нет. */
+  onScreens(cb: (who: ScreenShare[]) => void): Unsub;
 
   /**
    * Текстовый чат канала.

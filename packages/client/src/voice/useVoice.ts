@@ -3,6 +3,7 @@ import { MeshEngine } from "./MeshEngine.ts";
 import type { Attachment, ChatMessage } from "@badyum/shared";
 import type {
   ConnectionQuality,
+  ScreenShare,
   SelfState,
   TypingPeer,
   VoiceEngine,
@@ -30,6 +31,7 @@ export function useVoice() {
     speaking: false,
     transmitting: true,
     denoised: false,
+    sharing: false,
   });
   const [quality, setQuality] = useState<ConnectionQuality>({
     status: "idle",
@@ -38,6 +40,7 @@ export function useVoice() {
     relayed: false,
   });
   const [messages, setMessages] = useState<ChatMessage[]>([]);
+  const [screens, setScreens] = useState<ScreenShare[]>([]);
   const [typing, setTyping] = useState<TypingPeer[]>([]);
   const [error, setError] = useState<string | null>(null);
 
@@ -54,6 +57,7 @@ export function useVoice() {
       engine.onQuality(setQuality),
       engine.onChat(setMessages),
       engine.onTyping(setTyping),
+      engine.onScreens(setScreens),
       engine.onError((e) => setError(e.message)),
     ];
     return () => {
@@ -101,6 +105,7 @@ export function useVoice() {
     quality,
     messages,
     typing,
+    screens,
     error,
     join,
     leave: useCallback(() => engine.leave(), [engine]),
@@ -123,6 +128,8 @@ export function useVoice() {
       [engine],
     ),
     setDenoise: useCallback((on: boolean) => engine.setDenoise(on), [engine]),
+    startScreenShare: useCallback(() => engine.startScreenShare(), [engine]),
+    stopScreenShare: useCallback(() => engine.stopScreenShare(), [engine]),
     setParticipantVolume: useCallback(
       (userId: string, volume: number) => engine.setParticipantVolume(userId, volume),
       [engine],

@@ -246,6 +246,112 @@
   accent-color: var(--accent-lime);
 }
 
+/* --- Демонстрация экрана --- */
+
+/*
+  Чужой экран занимает почти весь канал: на него и смотрят. Плитки участников
+  при этом не исчезают — по ним видно, кто говорит, — но уезжают в узкую полосу
+  снизу (см. .stage--aside).
+*/
+.share {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  min-height: 0;
+  gap: 8px;
+  padding: 6px var(--space-6) 0;
+}
+
+.share__video {
+  flex: 1;
+  min-height: 0;
+  width: 100%;
+  /* contain: показывают окно целиком, обрезать его по краям нельзя. */
+  object-fit: contain;
+  border-radius: var(--radius-lg);
+  background: #000;
+}
+
+.share__who {
+  font-family: var(--font-mono);
+  font-size: 10px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--text-muted);
+  text-align: center;
+  flex-shrink: 0;
+}
+
+/* Показывают двое — переключатель между ними. Обычно этой строки нет. */
+.share__tabs {
+  display: flex;
+  gap: 6px;
+  flex-shrink: 0;
+}
+
+.share__tab {
+  padding: 6px 12px;
+  border-radius: var(--radius-md);
+  background: var(--bg-surface);
+  border: 1px solid var(--border-subtle);
+  color: var(--text-muted);
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.share__tab--on {
+  border-color: var(--accent-lime);
+  color: var(--text-primary);
+}
+
+/*
+  Сетка участников во время показа. Плитки становятся мелкими и уходят в один
+  ряд с прокруткой: главное сейчас не они.
+*/
+.stage--aside {
+  flex: 0 0 auto;
+  display: flex;
+  gap: 8px;
+  align-content: initial;
+  overflow-x: auto;
+  overflow-y: hidden;
+  padding: 8px var(--space-6);
+}
+
+.stage--aside .tile {
+  flex: 0 0 auto;
+  width: 116px;
+  min-height: 0;
+  padding: 10px;
+  gap: 6px;
+}
+
+.stage--aside .tile__avatar {
+  width: 38px;
+  height: 38px;
+  font-size: 13px;
+}
+
+.stage--aside .tile__name {
+  font-size: 11px;
+}
+
+/* Ползунок громкости и подпись статуса в мелкой плитке уже не читаются. */
+.stage--aside .tile__volume,
+.stage--aside .tile__status {
+  display: none;
+}
+
+/* Почему не вышло показать. Появляется редко и уходит вместе с попыткой. */
+.sharehint {
+  flex-shrink: 0;
+  padding: 9px var(--space-6);
+  background: rgba(255, 176, 32, 0.12);
+  border-top: 1px solid rgba(255, 176, 32, 0.32);
+  font-size: 12.5px;
+  text-align: center;
+}
+
 /* --- Плитка приглашения: пустое место никогда не тупик --- */
 
 .invite-tile {

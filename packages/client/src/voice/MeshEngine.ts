@@ -25,8 +25,16 @@ import { createMicPipeline, type MicPipeline } from "./audio/micPipeline.ts";
 import { keepAwake, type WakeHandle } from "./audio/wake.ts";
 import { apiOrigin } from "../api.ts";
 import { UploadError } from "./uploadError.ts";
+import { bitrateFor, captureScreen } from "./screen.ts";
 
 const STATS_INTERVAL_MS = 3000;
+
+/** Чужой показ экрана: кто показывает и что именно. */
+export interface ScreenShare {
+  userId: string;
+  displayName: string;
+  stream: MediaStream;
+}
 
 /**
  * P2P mesh: с каждым собеседником отдельное соединение.
@@ -107,6 +115,12 @@ export class MeshEngine implements VoiceEngine {
   /** Переписка канала. Переживает переподключение вместе с сокетом. */
   private messages: ChatMessage[] = [];
 
+  /** Наш экран, пока мы его показываем. */
+  private screen: MediaStream | null = null;
+  /** Чужие экраны: userId → поток. */
+  private readonly screens = new Map<string, MediaStream>();
+  private readonly screenSubs = new Set<(who: ScreenShare[]) => void>();
+
   constructor(wsUrl: string) {
     this.socket = new SignalingSocket(wsUrl);
   }
@@ -182,6 +196,13 @@ export class MeshEngine implements VoiceEngine {
 
     this.wake?.stop();
     this.wake = null;
+
+    // Показ прекращаем явно: иначе браузер оставит гореть индикатор «идёт
+    // запись экрана» после того, как человек уже вышел из канала.
+    for (const track of this.screen?.getTracks() ?? []) track.stop();
+    this.screen = null;
+    this.screens.clear();
+    this.emitScreens();
 
     this.vad?.stop();
     this.vad = null;
@@ -284,6 +305,96 @@ export class MeshEngine implements VoiceEngine {
     this.emitSelf();
   }
 
+  /**
+   * Начать показывать экран.
+   *
+   * Системный диалог выбора окна открывается первым: пока человек не выбрал,
+   * рассказывать остальным нечего, а флаг «показывает», выставленный заранее,
+   * пришлось бы снимать при каждом «Отмена».
+   */
+  async startScreenShare(): Promise<void> {
+    if (this.screen) return;
+
+    const stream = await captureScreen();
+    this.screen = stream;
+
+    /*
+      Показ прекращают двумя способами: нашей кнопкой и системной плашкой
+      «Остановить доступ» внизу экрана. Вторая нам ничего не сообщает — только
+      обрывает дорожку. Без этой подписки у остальных остался бы висеть
+      замерший кадр и надпись «показывает».
+    */
+    const video = stream.getVideoTracks()[0];
+    video?.addEventListener("ended", () => void this.stopScreenShare());
+
+    const share = bitrateFor(this.peers.size);
+    await Promise.all([...this.peers.values()].map((peer) => peer.addScreen(stream, share)));
+
+    this.socket.send({ type: "state", sharing: true });
+    this.emitSelf();
+  }
+
+  async stopScreenShare(): Promise<void> {
+    if (!this.screen) return;
+
+    for (const peer of this.peers.values()) peer.stopScreen();
+    for (const track of this.screen.getTracks()) track.stop();
+    this.screen = null;
+
+    this.socket.send({ type: "state", sharing: false });
+    this.emitSelf();
+  }
+
+  onScreens(cb: (who: ScreenShare[]) => void): Unsub {
+    this.screenSubs.add(cb);
+    cb(this.screenList());
+    return () => this.screenSubs.delete(cb);
+  }
+
+  private addScreenOf(userId: string, stream: MediaStream): void {
+    this.screens.set(userId, stream);
+
+    // Собеседник закрыл показ — поток обрывается, и кадр надо убрать. Иначе
+    // на экране навсегда останется последняя картинка того, что уже не идёт.
+    for (const track of stream.getVideoTracks()) {
+      track.addEventListener("ended", () => this.dropScreenOf(userId));
+    }
+
+    this.emitScreens();
+  }
+
+  private dropScreenOf(userId: string): void {
+    if (!this.screens.delete(userId)) return;
+    this.emitScreens();
+  }
+
+  private screenList(): ScreenShare[] {
+    return [...this.screens.entries()].map(([userId, stream]) => ({
+      userId,
+      displayName: this.participants.get(userId)?.displayName ?? "участник",
+      stream,
+    }));
+  }
+
+  private emitScreens(): void {
+    const list = this.screenList();
+    for (const cb of this.screenSubs) cb(list);
+  }
+
+  /**
+   * Пересчитать потолок на каждого зрителя.
+   *
+   * Зовётся при изменении состава: поток копируется каждому, и вошедший
+   * третий должен уменьшить долю остальных, а не добавиться сверху.
+   */
+  private async rebalanceScreen(): Promise<void> {
+    if (!this.screen) return;
+    const share = bitrateFor(this.peers.size);
+    await Promise.all(
+      [...this.peers.values()].map((peer) => peer.setScreenBitrate(share)),
+    );
+  }
+
   setParticipantVolume(userId: string, volume: number): void {
     this.mixer?.setVolume(userId, volume);
     const participant = this.participants.get(userId);
@@ -364,6 +475,9 @@ export class MeshEngine implements VoiceEngine {
           }
         }
 
+        // Показ переживает обрыв сигналинга у тех, с кем медиа осталось живо;
+        // с остальными соединение пересобрано выше, и экран им отдаст createPeer.
+
         // История заменяет локальную целиком: сервер — источник правды и
         // порядка, иначе после возврата сообщения задваивались бы.
         this.messages = msg.history;
@@ -408,6 +522,9 @@ export class MeshEngine implements VoiceEngine {
         this.peers.delete(msg.userId);
         this.mixer?.remove(msg.userId);
         this.participants.delete(msg.userId);
+        this.dropScreenOf(msg.userId);
+        // Зрителей стало меньше — оставшимся можно отдать больше.
+        void this.rebalanceScreen();
         this.emitParticipants();
         return;
       }
@@ -429,6 +546,13 @@ export class MeshEngine implements VoiceEngine {
         if (msg.muted !== undefined) participant.muted = msg.muted;
         if (msg.deafened !== undefined) participant.deafened = msg.deafened;
         if (msg.speaking !== undefined) participant.speaking = msg.speaking;
+        if (msg.sharing !== undefined) {
+          participant.sharing = msg.sharing;
+          // Флаг снят — значит поток уже не придёт, и ждать нечего. Событие
+          // `ended` на дорожке приходит не всегда: при обрыве соединения его
+          // не будет вовсе, и замерший кадр остался бы висеть.
+          if (!msg.sharing) this.dropScreenOf(msg.userId);
+        }
         this.emitParticipants();
         return;
       }
@@ -491,13 +615,36 @@ export class MeshEngine implements VoiceEngine {
         sendSignal: (payload: SignalPayload) => {
           this.socket.send({ type: "signal", to: peerId, payload });
         },
-        onTrack: (stream) => {
+        onTrack: (stream, track) => {
+          /*
+            Разбираем, что именно приехало. Видео бывает только одно — экран.
+            Со звуком сложнее: у экрана бывает своя звуковая дорожка, и от
+            микрофонной она отличается ровно тем, что живёт в потоке, где есть
+            видео. Поэтому смотрим на поток, а не на дорожку.
+          */
+          if (track.kind === "video" || stream.getVideoTracks().length > 0) {
+            this.addScreenOf(peerId, stream);
+            return;
+          }
+
           this.mixer?.add(peerId, stream);
           const participant = this.participants.get(peerId);
           if (participant) {
             participant.hasStream = true;
             this.emitParticipants();
           }
+
+          /*
+            Порядок событий не гарантирован: звук экрана может прийти раньше
+            своего видео, и тогда проверка выше его пропустит — он окажется в
+            микшере как микрофон, и человек услышит показ дважды. Слушаем поток:
+            появилось в нём видео — значит это был экран, забираем обратно.
+          */
+          stream.addEventListener("addtrack", (event) => {
+            if (event.track.kind !== "video") return;
+            this.mixer?.remove(peerId);
+            this.addScreenOf(peerId, stream);
+          });
         },
         onStateChange: (state) => {
           if (state === "failed") this.setQuality({ status: "reconnecting" });
@@ -509,6 +656,20 @@ export class MeshEngine implements VoiceEngine {
     });
 
     this.peers.set(peerId, peer);
+
+    /*
+      Если мы уже показываем экран, вошедший должен его увидеть. Без этого показ
+      видели бы только те, кто был в канале в момент нажатия кнопки, а зашедший
+      через минуту — нет, и выглядело бы это как случайная поломка.
+
+      Заодно пересчитываем потолок: зрителей стало больше, доля каждого меньше.
+    */
+    if (this.screen) {
+      void peer
+        .addScreen(this.screen, bitrateFor(this.peers.size))
+        .then(() => this.rebalanceScreen());
+    }
+
     return peer;
   }
 
@@ -700,6 +861,7 @@ export class MeshEngine implements VoiceEngine {
       speaking: this.speaking,
       transmitting: this.transmitting,
       denoised: this.denoised,
+      sharing: this.screen !== null,
     };
   }
 

@@ -9,9 +9,13 @@ import {
   LinkIcon,
   MicIcon,
   MicOffIcon,
+  ScreenIcon,
+  ScreenOffIcon,
   SpeakerIcon,
 } from "../../components/Icons.tsx";
 import { InviteTile } from "./InviteTile.tsx";
+import { ScreenStage } from "./ScreenStage.tsx";
+import { canShareScreen, describeScreenError } from "../../voice/screen.ts";
 import { useAccount } from "../../account.ts";
 import { Sidebar } from "./Sidebar.tsx";
 import { ChatPanel } from "./ChatPanel.tsx";
@@ -99,7 +103,30 @@ export function ChannelScreen({
    * как «меня не слышат, всё сломалось».
    */
   const [everUnmuted, setEverUnmuted] = useState(false);
+  /** Почему не вышло показать экран. Отказ в системном окне сюда не попадает. */
+  const [shareProblem, setShareProblem] = useState<string | null>(null);
   const identity = myIdentityId();
+
+  /**
+   * Умеет ли браузер отдавать экран.
+   *
+   * Считаем один раз: ответ не меняется, а от него зависит, показывать ли
+   * кнопку вовсе. Главный отказ — Safari на iPhone: показать оттуда нельзя,
+   * смотреть чужой показ можно.
+   */
+  const canShare = useMemo(() => canShareScreen(), []);
+
+  const toggleShare = async () => {
+    setShareProblem(null);
+    try {
+      if (voice.self.sharing) await voice.stopScreenShare();
+      else await voice.startScreenShare();
+    } catch (error) {
+      // null означает «человек нажал Отмена» — это не поломка, и говорить
+      // ему об этом нечего.
+      setShareProblem(describeScreenError(error));
+    }
+  };
 
   const recent = useMemo(() => recentChannels(), [storageTick, channelId]);
 
@@ -236,7 +263,11 @@ export function ChannelScreen({
 
       <StatusBanner quality={voice.quality} error={voice.error} joined={joined} />
 
-      <main className="stage">
+      {voice.screens.length > 0 ? (
+        <ScreenStage screens={voice.screens} deafened={voice.self.deafened} />
+      ) : null}
+
+      <main className={`stage${voice.screens.length > 0 ? " stage--aside" : ""}`}>
         <Tile
           userId="self"
           name={`${myName} (ты)`}
@@ -255,8 +286,14 @@ export function ChannelScreen({
             onVolume={(v) => voice.setParticipantVolume(participant.userId, v)}
           />
         ))}
-        <InviteTile channelId={channelId} />
+        {voice.screens.length === 0 ? <InviteTile channelId={channelId} /> : null}
       </main>
+
+      {shareProblem ? (
+        <div className="sharehint" role="status">
+          {shareProblem}
+        </div>
+      ) : null}
 
       {joined && voice.self.muted && !everUnmuted ? (
         <button
@@ -327,6 +364,19 @@ export function ChannelScreen({
           >
             <HeadphonesIcon />
           </button>
+
+          {/* Кнопки нет вовсе там, где показать нельзя: она бы молча не
+              срабатывала, и человек решил бы, что сломалось приложение. */}
+          {canShare ? (
+            <button
+              className={`ctrl ${voice.self.sharing ? "ctrl--on" : ""}`}
+              onClick={() => void toggleShare()}
+              title={voice.self.sharing ? "Остановить показ" : "Показать экран"}
+              type="button"
+            >
+              {voice.self.sharing ? <ScreenOffIcon /> : <ScreenIcon />}
+            </button>
+          ) : null}
 
           <button className="ctrl ctrl--leave" onClick={() => void leave()} type="button">
             <ExitIcon />

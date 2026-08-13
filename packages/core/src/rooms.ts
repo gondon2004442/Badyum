@@ -59,7 +59,7 @@ export class RoomRegistry {
   setState(
     channelId: string,
     userId: string,
-    patch: { muted?: boolean; deafened?: boolean; speaking?: boolean },
+    patch: { muted?: boolean; deafened?: boolean; speaking?: boolean; sharing?: boolean },
   ): Member | undefined {
     const member = this.rooms.get(channelId)?.get(userId);
     if (!member) return undefined;
@@ -67,6 +67,7 @@ export class RoomRegistry {
     if (patch.muted !== undefined) member.muted = patch.muted;
     if (patch.deafened !== undefined) member.deafened = patch.deafened;
     if (patch.speaking !== undefined) member.speaking = patch.speaking;
+    if (patch.sharing !== undefined) member.sharing = patch.sharing;
 
     // "Оглох" всегда подразумевает выключенный микрофон: слушать не могу, но
     // говорю — это состояние, которого пользователь не ожидает.
