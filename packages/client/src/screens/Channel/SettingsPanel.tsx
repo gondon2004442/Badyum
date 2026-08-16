@@ -1,6 +1,14 @@
 import { useEffect, useState, type FormEvent } from "react";
 import { listInputDevices, type AudioDevice } from "../../voice/audio/devices.ts";
-import { denoiseEnabled, rememberDenoise, rememberMyName } from "../../storage.ts";
+import {
+  denoiseEnabled,
+  rememberDenoise,
+  rememberHotkeys,
+  rememberMyName,
+  savedHotkeys,
+} from "../../storage.ts";
+import { DEFAULT_HOTKEYS, hotkeys as readHotkeys, isDesktop, setHotkeys } from "../../desktop.ts";
+import { comboFrom, describeHotkeyProblem, prettyCombo } from "../../hotkey.ts";
 
 interface SettingsPanelProps {
   selfName: string;
@@ -40,12 +48,76 @@ export function SettingsPanel({
   const [denoise, setDenoise] = useState(denoiseEnabled);
   /** Переключение пересобирает тракт: пока идёт, второй клик только навредит. */
   const [switching, setSwitching] = useState(false);
+  /** Клавиши настраиваются только в приложении: в браузере системных нет. */
+  const desktop = isDesktop();
+  const [keys, setKeys] = useState(() => savedHotkeys() ?? DEFAULT_HOTKEYS);
+  /** Какую клавишу сейчас переназначаем. `null` — никакую. */
+  const [capturing, setCapturing] = useState<"ptt" | "overlay" | null>(null);
+  const [keyProblem, setKeyProblem] = useState<string | null>(null);
 
   useEffect(() => {
     // Названия устройств браузер отдаёт только после доступа к микрофону —
     // здесь он уже выдан, потому что мы в канале.
     void listInputDevices().then(setDevices).catch(() => setDevices([]));
   }, []);
+
+  // Спрашиваем обёртку, что забиндено на самом деле. Клавишу мог занять кто-то
+  // другой, и тогда сохранённое у нас расходится с работающим — а человек жмёт
+  // написанное на экране и считает, что сломалось приложение.
+  useEffect(() => {
+    if (!desktop) return;
+    void readHotkeys().then((actual) => {
+      if (actual) setKeys(actual);
+    });
+  }, [desktop]);
+
+  /**
+   * Ловим следующее нажатие и делаем из него бинд.
+   *
+   * Слушаем в фазе перехвата и гасим событие: иначе выбранное сочетание попутно
+   * сработает как обычная клавиша — например, уедет в поле имени.
+   */
+  useEffect(() => {
+    if (!capturing) return;
+
+    const onKey = (event: KeyboardEvent) => {
+      event.preventDefault();
+      event.stopPropagation();
+
+      // Escape — передумал. Клавиша слишком нужна сама по себе, чтобы её занимать.
+      if (event.code === "Escape") {
+        setCapturing(null);
+        setKeyProblem(null);
+        return;
+      }
+
+      const { combo, problem } = comboFrom(event);
+      if (problem) {
+        // Модификаторы в одиночку — это ещё не нажатие, ждём продолжения молча.
+        if (problem === "modifier-only") return;
+        setKeyProblem(describeHotkeyProblem(problem));
+        return;
+      }
+
+      const next = { ...keys, [capturing]: combo! };
+      setCapturing(null);
+      setKeyProblem(null);
+
+      void setHotkeys(next)
+        .then((applied) => {
+          setKeys(applied);
+          rememberHotkeys(applied);
+          setNote("Клавиша переназначена");
+        })
+        .catch((error: unknown) => {
+          // Обёртка отказала — говорим почему: причин несколько, и они разные.
+          setKeyProblem(error instanceof Error ? error.message : String(error));
+        });
+    };
+
+    window.addEventListener("keydown", onKey, { capture: true });
+    return () => window.removeEventListener("keydown", onKey, { capture: true });
+  }, [capturing, keys]);
 
   const submitName = (event: FormEvent) => {
     event.preventDefault();
@@ -174,6 +246,44 @@ export function SettingsPanel({
                 : "Не поднялся — остаётся обработка браузера"}
         </p>
       </div>
+
+      {/*
+        Только в приложении. В браузере системных клавиш не бывает вовсе, и
+        настройка, которая ничего не меняет, хуже отсутствующей.
+      */}
+      {desktop ? (
+        <div className="settings__group">
+          <span className="settings__label">Клавиши</span>
+
+          {(
+            [
+              ["ptt", "Рация"],
+              ["overlay", "Панель поверх игры"],
+            ] as const
+          ).map(([which, title]) => (
+            <div className="settings__row" key={which}>
+              <span className="settings__keyname">{title}</span>
+              <button
+                className={`settings__key${capturing === which ? " settings__key--wait" : ""}`}
+                onClick={() => {
+                  setKeyProblem(null);
+                  setCapturing(capturing === which ? null : which);
+                }}
+                type="button"
+              >
+                {capturing === which ? "Нажми клавишу…" : prettyCombo(keys[which])}
+              </button>
+            </div>
+          ))}
+
+          <p className="settings__hint">
+            {capturing
+              ? "Escape — отменить"
+              : "Работают, даже когда окно не в фокусе. Панель видна поверх игры в оконном и безрамочном режиме; в полноэкранном её не показать — это умеет только оверлей, встроенный в саму игру."}
+          </p>
+          {keyProblem ? <p className="settings__problem">{keyProblem}</p> : null}
+        </div>
+      ) : null}
 
       {note ? <p className="settings__note">{note}</p> : null}
       </div>

@@ -10,6 +10,7 @@ const KEY_NAME = "badyum:name";
 const KEY_CHANNELS = "badyum:channels";
 const KEY_PEOPLE = "badyum:people";
 const KEY_DENOISE = "badyum:denoise";
+const KEY_HOTKEYS = "badyum:hotkeys";
 
 const RECENT_CHANNELS_LIMIT = 12;
 const RECENT_PEOPLE_LIMIT = 40;
@@ -167,4 +168,32 @@ export function denoiseEnabled(): boolean {
 
 export function rememberDenoise(on: boolean): void {
   write(KEY_DENOISE, on);
+}
+
+/** Сочетания клавиш в том виде, в котором их понимает обёртка: `Shift+F9`. */
+export interface SavedHotkeys {
+  ptt: string;
+  overlay: string;
+}
+
+/**
+ * Клавиши, выбранные в прошлый раз.
+ *
+ * `null`, пока человек ничего не менял: тогда обёртка остаётся на своих
+ * значениях по умолчанию, и переназначать их при каждом запуске незачем.
+ *
+ * Хранится здесь, а не на стороне обёртки: у неё нет своего файла настроек, а
+ * заводить его ради двух строк — лишняя сущность. Клавиши всё равно нужны
+ * только в приложении, а там localStorage свой и никуда не денется.
+ */
+export function savedHotkeys(): SavedHotkeys | null {
+  const saved = read<SavedHotkeys | null>(KEY_HOTKEYS, null);
+  // Проверяем форму: в хранилище могло остаться что угодно от прошлых версий,
+  // а мусор отсюда уедет прямо в системную регистрацию клавиш.
+  if (!saved || typeof saved.ptt !== "string" || typeof saved.overlay !== "string") return null;
+  return saved;
+}
+
+export function rememberHotkeys(next: SavedHotkeys): void {
+  write(KEY_HOTKEYS, next);
 }

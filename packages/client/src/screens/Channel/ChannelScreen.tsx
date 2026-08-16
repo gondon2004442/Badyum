@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { fetchInviteCode, publicOrigin } from "../../api.ts";
 import type { ConnectionQuality } from "../../voice/VoiceEngine.ts";
 import { usePushToTalk, useVoice } from "../../voice/useVoice.ts";
@@ -21,7 +21,15 @@ import { Sidebar } from "./Sidebar.tsx";
 import { ChatPanel } from "./ChatPanel.tsx";
 import { PeoplePanel } from "./PeoplePanel.tsx";
 import { SettingsPanel, savedInputDevice } from "./SettingsPanel.tsx";
-import { globalPushToTalkKey, isDesktop, onGlobalPushToTalk } from "../../desktop.ts";
+import {
+  globalPushToTalkKey,
+  isDesktop,
+  onGlobalPushToTalk,
+  onOverlayToggle,
+  setOverlay as setOverlayWindow,
+} from "../../desktop.ts";
+import { OverlayPanel } from "../Overlay/OverlayPanel.tsx";
+import { report } from "../../report.ts";
 import {
   denoiseEnabled,
   knownPeople,
@@ -105,6 +113,9 @@ export function ChannelScreen({
   const [everUnmuted, setEverUnmuted] = useState(false);
   /** Почему не вышло показать экран. Отказ в системном окне сюда не попадает. */
   const [shareProblem, setShareProblem] = useState<string | null>(null);
+  /** Свёрнуты ли мы в панель поверх игры. Только в десктопной обёртке. */
+  const [overlayOpen, setOverlayOpen] = useState(false);
+  const overlayRef = useRef(false);
   const identity = myIdentityId();
 
   /**
@@ -199,6 +210,61 @@ export function ChannelScreen({
     };
   }, [desktop, pttEnabled, onTransmitChange]);
 
+  /**
+   * Переключить панель поверх игры.
+   *
+   * Ref, а не только состояние: обработчик подписывается один раз и должен
+   * знать текущее значение, не пересоздаваясь на каждое переключение.
+   *
+   * Панель показываем только после того, как окно действительно стало панелью.
+   * Наоборот было бы хуже всего: обычный экран, обрезанный до 340 пикселей,
+   * выглядит как сломавшееся приложение.
+   */
+  const toggleOverlay = useCallback(() => {
+    const next = !overlayRef.current;
+
+    void setOverlayWindow(next)
+      .then(() => {
+        overlayRef.current = next;
+        setOverlayOpen(next);
+      })
+      .catch((error) => report("overlay", error));
+  }, []);
+
+  useEffect(() => {
+    if (!desktop) return;
+
+    let unlisten: (() => void) | null = null;
+    let cancelled = false;
+
+    void onOverlayToggle(toggleOverlay).then((off) => {
+      if (cancelled) off();
+      else unlisten = off;
+    });
+
+    return () => {
+      cancelled = true;
+      unlisten?.();
+    };
+  }, [desktop, toggleOverlay]);
+
+  /*
+    Выходя из канала, обязательно возвращаем окно.
+
+    Иначе человек, вышедший прямо из панели, остаётся с крошечным окном без
+    рамки, в котором открыт домашний экран, — и вернуть его нечем, потому что
+    клавиша панели работает только в канале.
+  */
+  useEffect(
+    () => () => {
+      if (overlayRef.current) {
+        overlayRef.current = false;
+        void setOverlayWindow(false).catch((error) => report("overlay-restore", error));
+      }
+    },
+    [],
+  );
+
   const leave = async () => {
     await voice.leave();
     onLeave();
@@ -214,6 +280,29 @@ export function ChannelScreen({
     if (voice.self.selfId) map.set(voice.self.selfId, account.account?.avatarUrl ?? null);
     return map;
   }, [voice.participants, voice.self.selfId, account.account?.avatarUrl]);
+
+  /*
+    Панель поверх игры — другая разметка того же компонента, а не другой экран.
+
+    Это принципиально. Отдай мы панель отдельному компоненту выше по дереву,
+    React размонтировал бы ChannelScreen вместе с useVoice, а тот держит
+    соединения, микрофон и звуковой граф. Разговор оборвался бы ровно в тот
+    момент, ради которого панель и заводилась.
+  */
+  if (overlayOpen) {
+    return (
+      <OverlayPanel
+        voice={voice}
+        channelId={channelId}
+        channelName={channelName}
+        selfName={myName}
+        selfAvatarUrl={account.account?.avatarUrl ?? null}
+        avatars={avatars}
+        onCollapse={toggleOverlay}
+        onLeave={() => void leave()}
+      />
+    );
+  }
 
   return (
     <div className="shell">
