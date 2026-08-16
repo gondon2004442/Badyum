@@ -10,6 +10,12 @@ on:
 
 jobs:
   installers:
+    # Без этого GITHUB_TOKEN выдаётся только на чтение, и tauri-action падает на
+    # «Resource not accessible by integration» уже после того, как всё собрано:
+    # установщики лежат на раннере, а создать релиз и приложить их к нему нечем.
+    permissions:
+      contents: write
+
     strategy:
       fail-fast: false
       matrix:

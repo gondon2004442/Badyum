@@ -1,5 +1,5 @@
 use serde::Serialize;
-use tauri::{Emitter, Manager};
+use tauri::Emitter;
 use tauri_plugin_global_shortcut::{Code, GlobalShortcutExt, Shortcut, ShortcutState};
 
 /// Клавиша рации по умолчанию.
@@ -33,6 +33,9 @@ fn ptt_hotkey() -> &'static str {
 /// запустил Badyum и зашёл в канал, второй вопрос был бы бессмысленным.
 #[cfg(target_os = "linux")]
 fn allow_microphone(app: &tauri::AppHandle) {
+    // Manager — ради get_webview_window. Импорт локальный: на macOS и Windows
+    // эта функция пустая, и трейт там оказался бы неиспользуемым.
+    use tauri::Manager;
     use webkit2gtk::{PermissionRequestExt, SettingsExt, WebViewExt};
 
     let Some(window) = app.get_webview_window("main") else {
