@@ -1,6 +1,14 @@
 import { useEffect, useRef, useState } from "react";
 import { Avatar } from "../../components/Avatar.tsx";
-import { describeAvatar, removeAvatar, squareOf, uploadAvatar } from "../../avatar.ts";
+import {
+  describeAvatar,
+  openImage,
+  removeAvatar,
+  renderSquare,
+  uploadAvatar,
+  type Crop,
+} from "../../avatar.ts";
+import { AvatarCrop } from "./AvatarCrop.tsx";
 import type { Account } from "../../account.ts";
 
 interface AvatarPickerProps {
@@ -19,7 +27,10 @@ interface AvatarPickerProps {
  * узнаёт о неудачной обрезке, уже поставив её всем на обозрение.
  */
 export function AvatarPicker({ account, onClose, onChanged }: AvatarPickerProps) {
-  const [preview, setPreview] = useState<{ blob: Blob; url: string } | null>(null);
+  /** Открытая картинка и способ отпустить её blob-ссылку. */
+  const [source, setSource] = useState<{ image: HTMLImageElement; release: () => void } | null>(null);
+  /** Что из неё выбрано. Меняется на каждое движение в редакторе. */
+  const cropRef = useRef<Crop | null>(null);
   const [busy, setBusy] = useState(false);
   const [problem, setProblem] = useState<string | null>(null);
   const fileRef = useRef<HTMLInputElement>(null);
@@ -32,13 +43,12 @@ export function AvatarPicker({ account, onClose, onChanged }: AvatarPickerProps)
    */
   const own = account.avatarUrl?.startsWith("/api/avatar/") ?? false;
 
-  // Предпросмотр живёт на blob-ссылке, и отпускать её надо руками.
+  // blob-ссылку отпускаем руками, иначе каждая примеренная и отвергнутая
+  // фотография остаётся висеть в памяти вкладки.
   useEffect(() => {
-    const url = preview?.url;
-    return () => {
-      if (url) URL.revokeObjectURL(url);
-    };
-  }, [preview]);
+    const release = source?.release;
+    return () => release?.();
+  }, [source]);
 
   useEffect(() => {
     const onKey = (event: KeyboardEvent) => {
@@ -53,8 +63,12 @@ export function AvatarPicker({ account, onClose, onChanged }: AvatarPickerProps)
     setProblem(null);
     setBusy(true);
     try {
-      const blob = await squareOf(file);
-      setPreview({ blob, url: URL.createObjectURL(blob) });
+      const opened = await openImage(file);
+      // Прежнюю отпускаем сами: смена картинки не размонтирует компонент, и
+      // эффект очистки тут не сработает.
+      source?.release();
+      cropRef.current = null;
+      setSource(opened);
     } catch (error) {
       setProblem(describeAvatar(error));
     } finally {
@@ -63,11 +77,12 @@ export function AvatarPicker({ account, onClose, onChanged }: AvatarPickerProps)
   };
 
   const save = async () => {
-    if (!preview) return;
+    if (!source || !cropRef.current) return;
     setBusy(true);
     setProblem(null);
     try {
-      onChanged(await uploadAvatar(preview.blob));
+      const square = await renderSquare(source.image, cropRef.current);
+      onChanged(await uploadAvatar(square));
       onClose();
     } catch (error) {
       setProblem(describeAvatar(error));
@@ -101,9 +116,15 @@ export function AvatarPicker({ account, onClose, onChanged }: AvatarPickerProps)
         </div>
 
         <div className="picker__body">
-          {/* Крупно: именно так её увидят на плитке в канале. */}
-          {preview ? (
-            <img className="picker__face" src={preview.url} alt="" />
+          {source ? (
+            <AvatarCrop
+              // key по картинке: у новой свои размеры, и начинать надо заново.
+              key={source.image.src}
+              image={source.image}
+              onChange={(crop) => {
+                cropRef.current = crop;
+              }}
+            />
           ) : (
             <Avatar
               userId={account.id}
@@ -114,9 +135,9 @@ export function AvatarPicker({ account, onClose, onChanged }: AvatarPickerProps)
           )}
 
           <p className="picker__hint">
-            {preview
-              ? "Так тебя будут видеть. Не нравится — выбери другую."
-              : "Квадрат вырезается из середины, поэтому лучше подойдёт фотография, где лицо по центру."}
+            {source
+              ? "Двигай картинку и приближай — в квадрат попадёт то, что видно."
+              : "Выбери фотографию: дальше можно будет подвинуть и приблизить."}
           </p>
         </div>
 
@@ -143,10 +164,10 @@ export function AvatarPicker({ account, onClose, onChanged }: AvatarPickerProps)
             disabled={busy}
             type="button"
           >
-            {preview ? "Другая" : "Выбрать картинку"}
+            {source ? "Другая" : "Выбрать картинку"}
           </button>
 
-          {preview ? (
+          {source ? (
             <button className="picker__save" onClick={() => void save()} disabled={busy} type="button">
               {busy ? "…" : "Поставить"}
             </button>

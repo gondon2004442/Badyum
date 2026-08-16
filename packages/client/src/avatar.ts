@@ -45,60 +45,69 @@ export function describeAvatar(error: unknown): string {
   return "Аватарка не загрузилась — проверь связь";
 }
 
-/**
- * Обрезать картинку в квадрат по центру и сжать.
- *
- * Обрезка по центру, а не выбор области мышью: на фотографиях лицо почти
- * всегда в середине, а рамка с перетаскиванием — это отдельный экран, который
- * ради одной картинки заводить рано. Предпросмотр перед отправкой возвращаем,
- * чтобы человек увидел результат до того, как согласится.
- */
-export async function squareOf(file: File): Promise<Blob> {
-  const bitmap = await readImage(file);
-
-  try {
-    // Берём наибольший квадрат, который влезает, и центрируем его.
-    const side = Math.min(bitmap.width, bitmap.height);
-    const sx = (bitmap.width - side) / 2;
-    const sy = (bitmap.height - side) / 2;
-
-    const canvas = document.createElement("canvas");
-    canvas.width = SIDE;
-    canvas.height = SIDE;
-
-    const ctx = canvas.getContext("2d");
-    if (!ctx) throw new AvatarError("decode");
-    // Без сглаживания уменьшенная фотография выглядит рваной.
-    ctx.imageSmoothingEnabled = true;
-    ctx.imageSmoothingQuality = "high";
-    ctx.drawImage(bitmap, sx, sy, side, side, 0, 0, SIDE, SIDE);
-
-    /*
-      JPEG, а не WebP или PNG. PNG на фотографии даёт файл в разы тяжелее без
-      выигрыша в качестве, а WebP отдают не все браузеры через canvas — и
-      узнать об этом пришлось бы уже на отправке. JPEG умеют все.
-    */
-    const blob = await new Promise<Blob | null>((resolve) => {
-      canvas.toBlob(resolve, "image/jpeg", QUALITY);
-    });
-    if (!blob) throw new AvatarError("decode");
-    return blob;
-  } finally {
-    // ImageBitmap держит память до явного закрытия — на телефоне это заметно.
-    if ("close" in bitmap) bitmap.close();
-  }
+/** Какой кусок картинки берём. Всё в пикселях исходника. */
+export interface Crop {
+  x: number;
+  y: number;
+  /** Сторона квадрата. Квадрат, потому что аватарка всегда квадратная. */
+  size: number;
 }
 
-async function readImage(file: File): Promise<ImageBitmap> {
-  if (!file.type.startsWith("image/")) throw new AvatarError("not_an_image");
+/**
+ * Нарисовать выбранный кусок и сжать.
+ *
+ * Кусок выбирает человек в редакторе — обрезка по центру угадывала не всегда,
+ * а лицо на фотографии сплошь и рядом не в середине.
+ */
+export async function renderSquare(source: CanvasImageSource, crop: Crop): Promise<Blob> {
+  const canvas = document.createElement("canvas");
+  canvas.width = SIDE;
+  canvas.height = SIDE;
 
-  try {
-    return await createImageBitmap(file);
-  } catch {
-    // Битый файл, неизвестный формат, HEIC на старом браузере — для человека
-    // это всё одно и то же: «эта картинка не подошла».
-    throw new AvatarError("decode");
-  }
+  const ctx = canvas.getContext("2d");
+  if (!ctx) throw new AvatarError("decode");
+  // Без сглаживания уменьшенная фотография выглядит рваной.
+  ctx.imageSmoothingEnabled = true;
+  ctx.imageSmoothingQuality = "high";
+  ctx.drawImage(source, crop.x, crop.y, crop.size, crop.size, 0, 0, SIDE, SIDE);
+
+  /*
+    JPEG, а не WebP или PNG. PNG на фотографии даёт файл в разы тяжелее без
+    выигрыша в качестве, а WebP отдают не все браузеры через canvas — и узнать
+    об этом пришлось бы уже на отправке. JPEG умеют все.
+  */
+  const blob = await new Promise<Blob | null>((resolve) => {
+    canvas.toBlob(resolve, "image/jpeg", QUALITY);
+  });
+  if (!blob) throw new AvatarError("decode");
+  return blob;
+}
+
+/**
+ * Открыть выбранный файл как картинку.
+ *
+ * Через <img> и blob-ссылку, а не createImageBitmap: тот же элемент показывается
+ * человеку в редакторе и он же потом рисуется в canvas. Второе представление той
+ * же картинки в памяти телефона лишнее, а blob-ссылка не портит canvas — она
+ * своего происхождения.
+ */
+export function openImage(file: File): Promise<{ image: HTMLImageElement; release: () => void }> {
+  if (!file.type.startsWith("image/")) return Promise.reject(new AvatarError("not_an_image"));
+
+  const url = URL.createObjectURL(file);
+  const release = () => URL.revokeObjectURL(url);
+
+  return new Promise((resolve, reject) => {
+    const image = new Image();
+    image.onload = () => resolve({ image, release });
+    image.onerror = () => {
+      release();
+      // Битый файл, неизвестный формат, HEIC на старом браузере — для человека
+      // это всё одно и то же: «эта картинка не подошла».
+      reject(new AvatarError("decode"));
+    };
+    image.src = url;
+  });
 }
 
 /** Отправить уже обрезанный квадрат. Возвращает адрес новой аватарки. */
