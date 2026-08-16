@@ -9,6 +9,7 @@ import { handleContacts } from "./api/contacts.ts";
 import { handleUsername } from "./api/username.ts";
 import { handleReport } from "./api/report.ts";
 import { handleFile, handleUpload } from "./api/files.ts";
+import { handleAvatar, handleAvatarFile } from "./api/avatar.ts";
 import { json } from "./http.ts";
 import type { Env } from "./env.ts";
 
@@ -179,6 +180,17 @@ export default {
     if (path === "/api/upload") return handleUpload(request, env);
     if (path.startsWith("/api/file/")) return handleFile(url, env);
 
+    /*
+      Аватарки. Отдача открыта всем — картинку видят все, кому виден человек.
+      Установка требует входа: аватарка принадлежит аккаунту, а у гостя его нет.
+    */
+    if (path.startsWith("/api/avatar/")) return handleAvatarFile(url, env);
+    if (path === "/api/avatar") {
+      const viewer = await new Auth(env).current(request);
+      if (!viewer) return json({ error: "auth_required" }, 401);
+      return handleAvatar(request, env, viewer);
+    }
+
     /**
      * Жалоба клиента на собственную поломку.
      *
@@ -278,11 +290,17 @@ export default {
       if (!resolved.ok) return json({ error: resolved.error }, statusFor(resolved.error));
 
       const channel = resolved.value.channel;
+      // Аватарку берём из аккаунта здесь: только у Worker'а есть и кука, и
+      // база. Гость войдёт без неё, и это правильно — картинка принадлежит
+      // аккаунту.
+      const viewer = await new Auth(env).current(request);
+
       const token = await new TokenSigner(env.BADYUM_TOKEN_SECRET).signJoinToken({
         userId: newUserId(),
         channelId: channel.id,
         identityId: parsed.data.identityId ?? null,
         displayName,
+        avatarUrl: viewer?.avatarUrl ?? null,
         inviteCode: parsed.data.code ?? null,
       });
 

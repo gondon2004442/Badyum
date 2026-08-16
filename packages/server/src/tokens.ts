@@ -13,6 +13,8 @@ export interface JoinClaims {
   inviteCode: string | null;
   /** Устойчивая личность, если клиент её прислал. Прав не даёт, см. протокол. */
   identityId?: string | null;
+  /** Аватарка вошедшего. Как и в Worker'е — едет в токене, а не из базы. */
+  avatarUrl?: string | null;
   exp: number;
   /** Токен переподключения: длинный срок жизни, инвайт уже не засчитывается. */
   resume?: boolean;

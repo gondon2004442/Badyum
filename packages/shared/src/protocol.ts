@@ -31,6 +31,13 @@ export const participantSchema = z.object({
   userId: userIdSchema,
   identityId: identityIdSchema.nullable(),
   displayName: z.string().min(1).max(32),
+  /**
+   * Аватарка, если человек вошёл в аккаунт и поставил её.
+   *
+   * Едет через токен входа: канал раздаёт участников сам и в базу за ними не
+   * ходит, а гость аккаунта не имеет вовсе — у него останутся инициалы.
+   */
+  avatarUrl: z.string().max(300).nullable(),
   /** Микрофон выключен — участника не слышно. */
   muted: z.boolean(),
   /** Участник "оглох" — сам никого не слышит (и подразумевает muted). */

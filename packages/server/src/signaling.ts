@@ -56,6 +56,7 @@ export function attachSignaling(
     userId: m.userId,
     identityId: m.identityId,
     displayName: m.displayName,
+    avatarUrl: m.avatarUrl,
     muted: m.muted,
     deafened: m.deafened,
     speaking: m.speaking,
@@ -151,6 +152,7 @@ export function attachSignaling(
             // до него они видели бы у новичка живой микрофон.
             muted: true,
             deafened: false,
+            avatarUrl: claims.avatarUrl ?? null,
             speaking: false,
             sharing: false,
           });
@@ -220,6 +222,7 @@ export function attachSignaling(
             displayName: claims.displayName,
             muted: true,
             deafened: false,
+            avatarUrl: claims.avatarUrl ?? null,
             speaking: false,
             sharing: false,
           };

@@ -1,10 +1,10 @@
-import { useEffect, useRef } from "react";
+import { useEffect, useMemo, useRef } from "react";
 import type { Caller } from "@badyum/shared";
 import { Avatar } from "../../components/Avatar.tsx";
 import { ExitIcon, PhoneIcon } from "../../components/Icons.tsx";
 import { ChatPanel } from "../Channel/ChatPanel.tsx";
 import { useVoice } from "../../voice/useVoice.ts";
-import { nameOf } from "../../account.ts";
+import { nameOf, useAccount } from "../../account.ts";
 import "../Channel/Channel.css";
 import "./Direct.css";
 
@@ -42,6 +42,24 @@ export function DirectScreen({
   busy,
 }: DirectScreenProps) {
   const voice = useVoice();
+
+  const account = useAccount();
+
+  /**
+   * Кто как выглядит. В личной переписке участников ровно двое, и обоих мы
+   * знаем и без канала: собеседник пришёл из контактов, свой аватар — из
+   * аккаунта.
+   */
+  const avatars = useMemo(
+    () =>
+      new Map<string, string | null>([
+        ...voice.participants.map((p) => [p.userId, p.avatarUrl] as const),
+        ...(voice.self.selfId
+          ? ([[voice.self.selfId, account.account?.avatarUrl ?? null]] as const)
+          : []),
+      ]),
+    [voice.participants, voice.self.selfId, account.account?.avatarUrl],
+  );
   const joined = useRef(false);
 
   useEffect(() => {
@@ -61,16 +79,12 @@ export function DirectScreen({
         </button>
 
         <span className="direct__face">
-          {peer.avatarUrl ? (
-            <img
-              className="direct__avatar"
-              src={peer.avatarUrl}
-              alt=""
-              referrerPolicy="no-referrer"
-            />
-          ) : (
-            <Avatar userId={peer.userId} name={nameOf(peer)} className="direct__avatar" />
-          )}
+          <Avatar
+            userId={peer.userId}
+            name={nameOf(peer)}
+            src={peer.avatarUrl}
+            className="direct__avatar"
+          />
           <span className={`contact__dot${online ? " contact__dot--on" : ""}`} />
         </span>
 
@@ -99,6 +113,7 @@ export function DirectScreen({
         onTyping={voice.setTyping}
         onUpload={voice.uploadFile}
         channelId={channelId}
+        avatars={avatars}
         placeholder={`Написать ${nameOf(peer)}`}
         empty={`Это переписка с ${nameOf(peer)}. Она никуда не денется между звонками.`}
       />

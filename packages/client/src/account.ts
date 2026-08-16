@@ -51,6 +51,8 @@ export interface AccountState {
   logout: () => Promise<void>;
   /** Юз выбран — обновляем общий стор, чтобы не перезагружать страницу. */
   setUsername: (username: string) => void;
+  /** Поставить или снять аватарку — во всём приложении разом. */
+  setAvatar: (avatarUrl: string | null) => void;
 }
 
 /**
@@ -60,7 +62,7 @@ export interface AccountState {
  * считается, и три одинаковых `/api/me` при открытии страницы это чистая
  * растрата. Заодно выход из аккаунта в одном месте виден сразу везде.
  */
-type Snapshot = Omit<AccountState, "logout" | "setUsername">;
+type Snapshot = Omit<AccountState, "logout" | "setUsername" | "setAvatar">;
 
 let snapshot: Snapshot = { account: null, available: false, loading: true };
 const listeners = new Set<() => void>();
@@ -127,5 +129,16 @@ export function useAccount(): AccountState {
     if (snapshot.account) set({ ...snapshot, account: { ...snapshot.account, username } });
   }, []);
 
-  return { ...state, logout, setUsername };
+  /**
+   * Обновить аватарку во всём приложении разом.
+   *
+   * Не перезапрос `/api/me`, а точечная правка снимка: адрес новой картинки нам
+   * уже вернула сама загрузка, а лишний запрос на бесплатном плане стоит ровно
+   * столько же, сколько любой другой.
+   */
+  const setAvatar = useCallback((avatarUrl: string | null) => {
+    if (snapshot.account) set({ ...snapshot, account: { ...snapshot.account, avatarUrl } });
+  }, []);
+
+  return { ...state, logout, setUsername, setAvatar };
 }
