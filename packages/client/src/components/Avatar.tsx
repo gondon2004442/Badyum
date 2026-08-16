@@ -1,9 +1,14 @@
 /**
- * Аватар — плоский квадрат с моноширинными инициалами и одним акцентным цветом.
+ * Аватар: своя картинка, если она есть, иначе инициалы.
  *
- * Пока нет загрузки картинок, участник всё равно должен опознаваться с одного
- * взгляда: одинаковые серые кружки в канале на шесть человек бесполезны. Цвет
- * выводится из userId, поэтому один и тот же человек всегда одного цвета.
+ * Развилка живёт здесь, а не в каждом вызывающем: раньше она была продублирована
+ * в сайдбаре, контактах и переписке, и стоило добавить картинку в четвёртом
+ * месте — про неё забывали.
+ *
+ * Инициалы не запасной вариант, а полноценный: у гостя аккаунта нет вовсе, а
+ * участник всё равно должен опознаваться с одного взгляда — одинаковые серые
+ * кружки в канале на шесть человек бесполезны. Цвет выводится из userId,
+ * поэтому один и тот же человек всегда одного цвета.
  */
 
 const ACCENTS = [
@@ -36,13 +41,36 @@ function initialsOf(name: string): string {
 interface AvatarProps {
   userId: string;
   name: string;
+  /** Картинка человека. `null` или пусто — рисуем инициалы. */
+  src?: string | null;
   size?: number;
   dimmed?: boolean;
   className?: string;
 }
 
-export function Avatar({ userId, name, size, dimmed, className }: AvatarProps) {
+export function Avatar({ userId, name, src, size, dimmed, className }: AvatarProps) {
   const accent = accentFor(userId);
+
+  if (src) {
+    return (
+      <img
+        className={className}
+        data-avatar=""
+        src={src}
+        alt=""
+        /*
+          Аватарка бывает с чужого домена (Google), и туда не должно уезжать,
+          с какой страницы её попросили.
+        */
+        referrerPolicy="no-referrer"
+        style={{
+          objectFit: "cover",
+          opacity: dimmed ? 0.5 : 1,
+          ...(size ? { width: size, height: size } : null),
+        }}
+      />
+    );
+  }
 
   return (
     <span

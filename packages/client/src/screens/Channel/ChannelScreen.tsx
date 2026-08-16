@@ -206,6 +206,15 @@ export function ChannelScreen({
 
   const total = voice.participants.length + 1;
 
+  /** Кто как выглядит — для переписки. Себя тоже: свои сообщения там же. */
+  const avatars = useMemo(() => {
+    const map = new Map<string, string | null>(
+      voice.participants.map((p) => [p.userId, p.avatarUrl]),
+    );
+    if (voice.self.selfId) map.set(voice.self.selfId, account.account?.avatarUrl ?? null);
+    return map;
+  }, [voice.participants, voice.self.selfId, account.account?.avatarUrl]);
+
   return (
     <div className="shell">
       <Sidebar
@@ -271,6 +280,7 @@ export function ChannelScreen({
         <Tile
           userId="self"
           name={`${myName} (ты)`}
+          avatarUrl={account.account?.avatarUrl}
           speaking={voice.self.speaking}
           muted={voice.self.muted}
           isSelf
@@ -280,6 +290,7 @@ export function ChannelScreen({
             key={participant.userId}
             userId={participant.userId}
             name={participant.displayName}
+            avatarUrl={participant.avatarUrl}
             speaking={participant.speaking}
             muted={participant.muted}
             volume={participant.volume}
@@ -436,6 +447,7 @@ export function ChannelScreen({
             onTyping={voice.setTyping}
             onUpload={voice.uploadFile}
             channelId={channelId}
+            avatars={avatars}
           />
         ) : (
           <PeoplePanel
@@ -456,6 +468,8 @@ export function ChannelScreen({
 interface TileProps {
   userId: string;
   name: string;
+  /** Картинка человека. Нет — остаются инициалы, и это нормальный вид. */
+  avatarUrl?: string | null;
   speaking: boolean;
   muted: boolean;
   isSelf?: boolean;
@@ -463,13 +477,14 @@ interface TileProps {
   onVolume?: (value: number) => void;
 }
 
-function Tile({ userId, name, speaking, muted, isSelf, volume, onVolume }: TileProps) {
+function Tile({ userId, name, avatarUrl, speaking, muted, isSelf, volume, onVolume }: TileProps) {
   return (
     <div className="tile">
       <div className={`tile__ring ${speaking ? "tile__ring--speaking" : ""}`}>
         <Avatar
           userId={userId}
           name={name}
+          src={avatarUrl}
           className={`tile__avatar ${muted ? "tile__avatar--muted" : ""}`}
         />
       </div>

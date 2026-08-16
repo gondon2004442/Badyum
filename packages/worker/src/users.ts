@@ -15,6 +15,11 @@ export interface User {
   tag: string;
   displayName: string;
   avatarUrl: string | null;
+  /**
+   * Своя аватарка отдельно от вычисленной. Нужна ровно затем, чтобы при замене
+   * знать, какой объект в хранилище больше не нужен.
+   */
+  avatarOwn: string | null;
   createdAt: number;
 }
 
@@ -25,6 +30,7 @@ interface Row {
   tag: string;
   display_name: string;
   avatar_url: string | null;
+  avatar_own: string | null;
   created_at: number;
 }
 
@@ -34,7 +40,13 @@ const toUser = (row: Row): User => ({
   nick: row.nick,
   tag: row.tag,
   displayName: row.display_name,
-  avatarUrl: row.avatar_url,
+  /*
+    Своя картинка важнее гугловой. Google обновляет avatar_url при каждом
+    входе, поэтому «своё» и «пришедшее из профиля» обязаны жить раздельно —
+    иначе выбор человека сбрасывался бы сам собой.
+  */
+  avatarUrl: row.avatar_own ?? row.avatar_url,
+  avatarOwn: row.avatar_own,
   createdAt: row.created_at,
 });
 
@@ -87,6 +99,23 @@ export class Users {
    * проверкой и записью его успевает занять другой. Поэтому пишем сразу и
    * полагаемся на уникальный индекс, а «занято» узнаём из его отказа.
    */
+  /**
+   * Поставить свою аватарку.
+   *
+   * Возвращает прежнюю, чтобы вызывающий мог удалить её из хранилища: иначе
+   * каждая смена картинки оставляла бы в бакете мусор навсегда.
+   */
+  async setAvatar(userId: string, path: string | null): Promise<string | null> {
+    const before = await this.byId(userId);
+
+    await this.db
+      .prepare("UPDATE users SET avatar_own = ? WHERE id = ?")
+      .bind(path, userId)
+      .run();
+
+    return before?.avatarOwn ?? null;
+  }
+
   async setUsername(
     id: string,
     username: string,
@@ -135,7 +164,15 @@ export class Users {
         .prepare("UPDATE users SET display_name = ?, avatar_url = ? WHERE id = ?")
         .bind(profile.name, profile.picture, existing.id)
         .run();
-      return { ...existing, displayName: profile.name, avatarUrl: profile.picture };
+      return {
+        ...existing,
+        displayName: profile.name,
+        // Гугловую картинку обновили в базе, но показываем по-прежнему свою,
+        // если она есть: иначе вход через Google сбрасывал бы выбор человека
+        // ровно до следующей перезагрузки страницы, и это выглядело бы как
+        // «аватарка не сохранилась».
+        avatarUrl: existing.avatarOwn ?? profile.picture,
+      };
     }
 
     const nick = nickFromName(profile.name);
@@ -162,6 +199,8 @@ export class Users {
           tag,
           displayName: profile.name,
           avatarUrl: profile.picture,
+          // Только что заведённый аккаунт своей картинки ещё не имеет.
+          avatarOwn: null,
           createdAt,
         };
       } catch (err) {

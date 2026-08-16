@@ -193,20 +193,12 @@ function Row({
         type={onOpen ? "button" : undefined}
       >
       <span className="contact__face">
-        {contact.user.avatarUrl ? (
-          <img
-            className="contact__avatar contact__avatar--photo"
-            src={contact.user.avatarUrl}
-            alt=""
-            referrerPolicy="no-referrer"
-          />
-        ) : (
-          <Avatar
-            userId={contact.user.id}
-            name={nameOf(contact.user)}
-            className="contact__avatar"
-          />
-        )}
+        <Avatar
+          userId={contact.user.id}
+          name={nameOf(contact.user)}
+          src={contact.user.avatarUrl}
+          className="contact__avatar"
+        />
         {/* Точка только у тех, про кого мы знаем наверняка — у друзей. */}
         {online !== undefined ? (
           <span className={`contact__dot${online ? " contact__dot--on" : ""}`} />

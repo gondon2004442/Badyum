@@ -71,7 +71,7 @@ export class Friends {
     const { results } = await this.db
       .prepare(
         `SELECT f.user_a, f.user_b, f.requested_by, f.status, f.created_at,
-                u.id, u.username, u.nick, u.tag, u.display_name, u.avatar_url
+                u.id, u.username, u.nick, u.tag, u.display_name, u.avatar_url, u.avatar_own
            FROM friendships f
            JOIN users u
              ON u.id = CASE WHEN f.user_a = ?1 THEN f.user_b ELSE f.user_a END
@@ -87,6 +87,7 @@ export class Friends {
           tag: string;
           display_name: string;
           avatar_url: string | null;
+          avatar_own: string | null;
         }
       >();
 
@@ -99,7 +100,8 @@ export class Friends {
           nick: row.nick,
           tag: row.tag,
           displayName: row.display_name,
-          avatarUrl: row.avatar_url,
+          // Своя картинка важнее гугловой — как и в Users.
+          avatarUrl: row.avatar_own ?? row.avatar_url,
         },
         relation: relationFor(viewer, otherOf(link, viewer), link),
         since: row.created_at,

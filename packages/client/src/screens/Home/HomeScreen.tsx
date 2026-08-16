@@ -4,6 +4,7 @@ import { handleOf, loginUrl, nameFor, nameOf, useAccount } from "../../account.t
 import { useContacts } from "../../contacts.ts";
 import type { PresenceState } from "../../presence.ts";
 import { Contacts } from "./Contacts.tsx";
+import { AvatarPicker } from "./AvatarPicker.tsx";
 import { Sidebar } from "../Channel/Sidebar.tsx";
 import { Avatar } from "../../components/Avatar.tsx";
 import { GoogleIcon, LinkIcon, SpeakerIcon } from "../../components/Icons.tsx";
@@ -74,6 +75,8 @@ export function HomeScreen({
    * контактов нет вовсе, ему остаются каналы.
    */
   const [tab, setTab] = useState<Tab>("contacts");
+  /** Открыт ли выбор аватарки. Отсюда её и меняют — экран профиля тут. */
+  const [pickingAvatar, setPickingAvatar] = useState(false);
   const showContacts = Boolean(account.account) && tab === "contacts";
 
   const identity = myIdentityId();
@@ -112,7 +115,16 @@ export function HomeScreen({
         onLogout={() => void account.logout()}
         onOpenSettings={() => setTick((t) => t + 1)}
         onChangeUsername={onChangeUsername}
+        onPickAvatar={() => setPickingAvatar(true)}
       />
+
+      {pickingAvatar && account.account ? (
+        <AvatarPicker
+          account={account.account}
+          onClose={() => setPickingAvatar(false)}
+          onChanged={account.setAvatar}
+        />
+      ) : null}
 
       <main className="home">
         <div className="home__inner">
@@ -126,11 +138,20 @@ export function HomeScreen({
           <div className="home__account">
             {account.account ? (
               <>
-                <Avatar
-                  userId={account.account.id}
-                  name={nameOf(account.account)}
-                  className="home__person-avatar"
-                />
+                {/* На телефоне сайдбар скрыт, и это единственный вход в аватарку. */}
+                <button
+                  className="home__account-face"
+                  onClick={() => setPickingAvatar(true)}
+                  title="Сменить аватарку"
+                  type="button"
+                >
+                  <Avatar
+                    userId={account.account.id}
+                    name={nameOf(account.account)}
+                    src={account.account.avatarUrl}
+                    className="home__person-avatar"
+                  />
+                </button>
                 <span className="home__account-name">
                   {nameOf(account.account)}
                   <button

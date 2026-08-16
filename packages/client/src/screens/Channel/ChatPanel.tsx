@@ -31,6 +31,15 @@ interface ChatPanelProps {
   onUpload?: (file: File, size?: { width: number; height: number }) => Promise<Attachment>;
   /** Нужен, чтобы собрать адрес файла: канал — часть ключа в хранилище. */
   channelId?: string;
+  /**
+   * Аватарки по userId.
+   *
+   * Берутся из состава канала, а не из самого сообщения: хранить картинку в
+   * каждой строке истории значило бы дублировать её сотню раз. У того, кто уже
+   * вышел, останутся инициалы — и это честно, мы про него больше ничего не
+   * знаем.
+   */
+  avatars?: Map<string, string | null>;
 }
 
 /**
@@ -103,6 +112,7 @@ export function ChatPanel({
   empty = "Здесь можно написать, когда говорить не с руки — скинуть ссылку или ответить, не перебивая.",
   onUpload,
   channelId,
+  avatars,
 }: ChatPanelProps) {
   const [text, setText] = useState("");
   /** Файл выбран, но ещё не отправлен: висит над полем, пока не нажмут ↵. */
@@ -242,6 +252,7 @@ export function ChatPanel({
                 <Avatar
                   userId={head.userId}
                   name={head.displayName}
+                  src={avatars?.get(head.userId)}
                   className="msg__avatar"
                 />
                 <div className="msg__body">

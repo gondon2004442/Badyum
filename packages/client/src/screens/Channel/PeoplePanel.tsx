@@ -70,6 +70,7 @@ export function PeoplePanel({
             <Avatar
               userId={participant.identityId ?? participant.userId}
               name={participant.displayName}
+              src={participant.avatarUrl}
               className="person__avatar"
               dimmed={participant.muted}
             />

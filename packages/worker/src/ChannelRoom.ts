@@ -31,6 +31,7 @@ const toParticipant = (a: Attached): Participant => ({
   userId: a.userId,
   identityId: a.identityId,
   displayName: a.displayName,
+  avatarUrl: a.avatarUrl,
   muted: a.muted,
   deafened: a.deafened,
   speaking: a.speaking,
@@ -379,6 +380,7 @@ export class ChannelRoom extends DurableObject<Env> {
       // вещает, не зная об этом.
       muted: previous?.who.muted ?? true,
       deafened: previous?.who.deafened ?? false,
+      avatarUrl: claims.avatarUrl ?? null,
       speaking: false,
       sharing: false,
       channelName: channel.name,

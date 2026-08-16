@@ -26,6 +26,8 @@ interface SidebarProps {
   onOpenSettings: () => void;
   /** Сменить юз. Необязателен: из канала за этим не ходят. */
   onChangeUsername?: () => void;
+  /** Сменить аватарку. Нет — свой аватар остаётся просто картинкой. */
+  onPickAvatar?: () => void;
   /** Аккаунт, если человек вошёл. Гость — null, и это нормальный режим. */
   account: Account | null;
   /** Настроен ли вход. Кнопку, которая не сработает, показывать нельзя. */
@@ -53,6 +55,7 @@ export function Sidebar({
   onChanged,
   onOpenSettings,
   onChangeUsername,
+  onPickAvatar,
   account,
   loginAvailable,
   onLogout,
@@ -90,20 +93,12 @@ export function Sidebar({
                   title={`Переписка с ${nameOf(chat.peer!)}`}
                   type="button"
                 >
-                  {chat.peer!.avatarUrl ? (
-                    <img
-                      className="chan__face chan__face--photo"
-                      src={chat.peer!.avatarUrl}
-                      alt=""
-                      referrerPolicy="no-referrer"
-                    />
-                  ) : (
-                    <Avatar
-                      userId={chat.peer!.userId}
-                      name={nameOf(chat.peer!)}
-                      className="chan__face"
-                    />
-                  )}
+                  <Avatar
+                    userId={chat.peer!.userId}
+                    name={nameOf(chat.peer!)}
+                    src={chat.peer!.avatarUrl}
+                    className="chan__face"
+                  />
                   <span className="chan__name">{nameOf(chat.peer!)}</span>
                 </button>
                 <button
@@ -195,21 +190,33 @@ export function Sidebar({
       ) : null}
 
       <div className="sidebar__me">
-        {account?.avatarUrl ? (
-          // Аватар от Google — обычная картинка, и она может не загрузиться.
-          // Тогда остаётся то же место и те же инициалы, что у гостя.
-          <img
-            className="sidebar__avatar sidebar__avatar--photo"
-            src={account.avatarUrl}
-            alt=""
-            referrerPolicy="no-referrer"
-          />
+        {/*
+          Инициалы и цвет берём от того же, чьё имя написано рядом: иначе у
+          вошедшего под ником dumax в квадрате оставалось «ГО» от гостя.
+
+          Вошедшему это ещё и кнопка: аватарку меняют отсюда. Гостю менять
+          нечего — картинка принадлежит аккаунту, которого у него нет.
+        */}
+        {account && onPickAvatar ? (
+          <button
+            className="sidebar__face"
+            onClick={onPickAvatar}
+            title="Сменить аватарку"
+            type="button"
+          >
+            <Avatar
+              userId={account.id}
+              name={nameOf(account)}
+              src={account.avatarUrl}
+              className="sidebar__avatar"
+            />
+            <span className="sidebar__face-hint">сменить</span>
+          </button>
         ) : (
-          // Инициалы и цвет берём от того же, чьё имя написано рядом: иначе у
-          // вошедшего под ником dumax в квадрате оставалось «ГО» от гостя.
           <Avatar
             userId={account?.id ?? selfIdentity}
             name={account ? nameOf(account) : selfName}
+            src={account?.avatarUrl}
             className="sidebar__avatar"
           />
         )}
