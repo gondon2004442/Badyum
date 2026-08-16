@@ -1,4 +1,4 @@
-import { useEffect } from "react";
+import { useEffect, useRef } from "react";
 import { formatBytes, type Attachment } from "@badyum/shared";
 
 interface LightboxProps {
@@ -19,9 +19,19 @@ interface LightboxProps {
  * живой, звук идёт.
  */
 export function Lightbox({ attachment, src, onClose }: LightboxProps) {
+  /*
+    Обработчик держим в ref, а эффект вешаем один раз на всю жизнь просмотра.
+    Иначе он зависел бы от onClose, который вызывающий создаёт заново на каждом
+    рендере, — и любое новое сообщение в чате перезапускало бы эффект. В его
+    очистке стоит history.back(), тот вызывает popstate, и просмотр закрывался
+    сам. Со стороны это выглядело как «картинку выкидывает».
+  */
+  const closeRef = useRef(onClose);
+  closeRef.current = onClose;
+
   useEffect(() => {
     const onKey = (event: KeyboardEvent) => {
-      if (event.key === "Escape") onClose();
+      if (event.key === "Escape") closeRef.current();
     };
     window.addEventListener("keydown", onKey);
 
@@ -31,7 +41,7 @@ export function Lightbox({ attachment, src, onClose }: LightboxProps) {
       возвращаемся ровно к той беде, от которой уходим.
     */
     history.pushState({ badyumLightbox: true }, "");
-    const onPop = () => onClose();
+    const onPop = () => closeRef.current();
     window.addEventListener("popstate", onPop);
 
     return () => {
@@ -41,7 +51,10 @@ export function Lightbox({ attachment, src, onClose }: LightboxProps) {
       // «назад» съест не то.
       if (history.state?.badyumLightbox) history.back();
     };
-  }, [onClose]);
+    // Пустые зависимости намеренно: эффект про жизнь просмотра, а не про то,
+    // какой именно обработчик закрытия сейчас в пропсах.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   return (
     <div className="lightbox" onClick={onClose} role="dialog" aria-label={attachment.name}>
@@ -67,13 +80,20 @@ export function Lightbox({ attachment, src, onClose }: LightboxProps) {
         </button>
       </div>
 
-      <img
-        className="lightbox__img"
-        src={src}
-        alt={attachment.name}
-        // Клик по самой картинке не закрывает: в неё целятся, чтобы рассмотреть.
-        onClick={(e) => e.stopPropagation()}
-      />
+      {/*
+        Обёртка нужна, чтобы вокруг картинки оставалось место, по которому можно
+        закрыть кликом. Без неё картинка растягивалась на всю ширину и
+        перехватывала клик «мимо» — закрыть по фону было физически негде.
+      */}
+      <div className="lightbox__area">
+        <img
+          className="lightbox__img"
+          src={src}
+          alt={attachment.name}
+          // Клик по самой картинке не закрывает: в неё целятся, чтобы рассмотреть.
+          onClick={(e) => e.stopPropagation()}
+        />
+      </div>
     </div>
   );
 }

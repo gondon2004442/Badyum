@@ -364,28 +364,39 @@ function withOpusTuning(sdp: string | undefined): string | undefined {
 }
 
 /**
- * Потолок битрейта для видео.
+ * Настройка исходящего видео. Три параметра, и первые два важнее третьего.
  *
- * Без него браузер разгоняется до нескольких мегабит на каждого зрителя, а в
- * mesh каждый зритель получает свою копию: домашний upstream кончается, и
- * первым сыпется не картинка, а голос — он идёт по тому же каналу.
+ * `contentHint = "detail"` — это экран, а не камера. Разница не косметическая:
+ * при `"motion"` браузер держит частоту кадров и жертвует разрешением, и
+ * 1920×1080 уезжает в 640×360 даже тогда, когда канал позволяет вчетверо
+ * больше. На экране дорого именно разрешение: размытый текст и интерфейс не
+ * читаются вовсе, а пропущенный кадр обычно незаметен — картинка почти всё
+ * время стоит.
  *
- * `contentHint = "motion"` — под игру: при нехватке канала браузер пожертвует
- * чёткостью, но сохранит плавность. Для показа текста было бы наоборот.
+ * `degradationPreference = "maintain-resolution"` — то же самое, сказанное
+ * явно. Без него браузер выбирает сам, исходя из подсказки, и выбирает не в
+ * нашу пользу.
+ *
+ * `maxBitrate` — потолок, а не запрос. Пока на экране ничего не движется,
+ * уходят десятки килобит: кодировщик платит за изменения, а не за пиксели.
+ * В mesh потолок делится на зрителей — каждый получает свою копию.
  */
 async function tuneVideo(sender: RTCRtpSender, maxBitrate: number): Promise<void> {
-  if (sender.track) sender.track.contentHint = "motion";
+  if (sender.track) sender.track.contentHint = "detail";
 
   const parameters = sender.getParameters();
   // Пустой encodings встречается до первого пересогласования — тогда правку
   // применит следующий вызов, уже после установки описания.
   if (!parameters.encodings?.length) parameters.encodings = [{}];
   parameters.encodings[0]!.maxBitrate = maxBitrate;
+  // Явный запрет уменьшать картинку: именно это и происходило.
+  parameters.encodings[0]!.scaleResolutionDownBy = 1;
+  parameters.degradationPreference = "maintain-resolution";
 
   try {
     await sender.setParameters(parameters);
   } catch (error) {
-    // Не критично: без потолка картинка просто жаднее к каналу.
-    console.warn("[peer] не удалось ограничить битрейт видео", error);
+    // Не критично: без настройки картинка просто хуже и жаднее к каналу.
+    console.warn("[peer] не удалось настроить видео", error);
   }
 }
