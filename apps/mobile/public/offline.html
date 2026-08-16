@@ -1,0 +1,77 @@
+<!doctype html>
+<html lang="ru">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+    <title>Badyum</title>
+    <style>
+      /*
+        Единственная страница, которая лежит внутри APK. Стили здесь свои и
+        нарочно простые: она показывается ровно тогда, когда сервер недоступен,
+        а значит подтянуть шрифты и таблицу стилей с него неоткуда.
+      */
+      :root {
+        color-scheme: dark;
+      }
+
+      body {
+        margin: 0;
+        min-height: 100dvh;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        gap: 20px;
+        padding: 24px calc(24px + env(safe-area-inset-right)) 24px
+          calc(24px + env(safe-area-inset-left));
+        background: #0b0c11;
+        color: #eef0f6;
+        font: 16px/1.5 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+        text-align: center;
+      }
+
+      .mark {
+        width: 64px;
+        height: 64px;
+        border-radius: 18px;
+        background: #c3f53c;
+        color: #0b0c11;
+        font-size: 38px;
+        font-weight: 700;
+        display: grid;
+        place-items: center;
+      }
+
+      h1 {
+        margin: 0;
+        font-size: 20px;
+      }
+
+      p {
+        margin: 0;
+        max-width: 30ch;
+        color: #9aa0b4;
+      }
+
+      button {
+        margin-top: 4px;
+        padding: 14px 28px;
+        /* Не меньше 44 px по высоте: в это надо попадать пальцем. */
+        min-height: 48px;
+        border: 0;
+        border-radius: 12px;
+        background: #c3f53c;
+        color: #0b0c11;
+        font: inherit;
+        font-weight: 600;
+        cursor: pointer;
+      }
+    </style>
+  </head>
+  <body>
+    <div class="mark">B</div>
+    <h1>Нет связи с сервером</h1>
+    <p>Проверь интернет на телефоне и попробуй ещё раз.</p>
+    <button type="button" onclick="location.reload()">Повторить</button>
+  </body>
+</html>

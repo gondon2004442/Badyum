@@ -91,6 +91,23 @@ jobs:
             - **Windows** — файл `.msi`
             - **macOS** — файл `.dmg`
             - **Linux** — `.AppImage` или `.deb`
+            - **Android** — файл `.apk`
+
+            ### Android
+
+            Главное отличие от сайта: **разговор не обрывается**, когда
+            свернул приложение или заблокировал экран. В браузере на телефоне
+            так не умеет никто — вкладку усыпляют, и голос пропадает.
+
+            Ставится файлом, минуя магазин, поэтому телефон спросит разрешение
+            устанавливать из этого источника — надо согласиться. При первом
+            входе в канал спросит микрофон, а следом уведомления: второе можно
+            и запретить, разговор от этого не сломается, просто пропадёт
+            плашка «Идёт разговор».
+
+            Обновлять приложение ради изменений в интерфейсе не нужно — сайт
+            оно берёт с сервера. Новый `.apk` нужен, только когда меняется сама
+            оболочка.
 
             ### Система будет ругаться, и это ожидаемо
 
@@ -109,3 +126,119 @@ jobs:
             новую версию надо скачать отсюда же.
           releaseDraft: true
           prerelease: false
+
+  # Android собирается отдельно: платформа одна, а матрица выше про настольные
+  # системы. Ждёт установщиков, потому что черновик релиза заводят они, — файл
+  # надо к чему-то прикладывать.
+  android:
+    needs: installers
+    runs-on: ubuntu-latest
+
+    permissions:
+      contents: write
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+
+      # AGP 8.13 не собирается на JDK ниже 17. Берём 21: на нём же собирают
+      # Capacitor, и предупреждений о неподдерживаемой версии не будет.
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 21
+
+      - uses: gradle/actions/setup-gradle@v4
+
+      - run: pnpm install --frozen-lockfile
+
+      - name: Адрес сервера
+        shell: bash
+        run: |
+          SERVER="${{ vars.BADYUM_SERVER_URL }}"
+          if [ -z "$SERVER" ]; then
+            echo "::error::Не задана переменная BADYUM_SERVER_URL — приложение собралось бы без адреса сервера и открывало бы пустой экран."
+            exit 1
+          fi
+          echo "BADYUM_SERVER_URL=$SERVER" >> "$GITHUB_ENV"
+          echo "Сервер: $SERVER"
+
+      # Переносит адрес сервера и список плагинов в проект Android: оба файла
+      # генерируются и в репозиторий не попадают, так что шаг обязателен.
+      - name: Синхронизировать проект
+        working-directory: apps/mobile
+        run: npx cap sync android
+
+      - name: Собрать APK
+        working-directory: apps/mobile/android
+        env:
+          # Номер прогона монотонно растёт — ровно то, чего требует Android от
+          # versionCode, чтобы разрешить обновление поверх установленного.
+          BADYUM_VERSION_CODE: ${{ github.run_number }}
+          BADYUM_VERSION_NAME: ${{ startsWith(github.ref, 'refs/tags/') && github.ref_name || '0.0.0-dev' }}
+        run: |
+          chmod +x gradlew
+          ./gradlew assembleDebug --no-daemon
+
+      - name: Назвать файл по-человечески
+        shell: bash
+        run: |
+          VERSION="${{ startsWith(github.ref, 'refs/tags/') && github.ref_name || 'dev' }}"
+          mkdir -p dist
+          cp apps/mobile/android/app/build/outputs/apk/debug/app-debug.apk \
+             "dist/Badyum_${VERSION}.apk"
+          echo "APK_NAME=Badyum_${VERSION}.apk" >> "$GITHUB_ENV"
+          echo "APK_PATH=dist/Badyum_${VERSION}.apk" >> "$GITHUB_ENV"
+
+      # Кладём и в артефакты прогона: при ручном запуске релиза нет, а
+      # проверить сборку всё равно надо.
+      - uses: actions/upload-artifact@v4
+        with:
+          name: android-apk
+          path: dist/*.apk
+
+      # Прикладываем точечно, через API, а не готовым действием: черновик уже
+      # создан tauri-action вместе с описанием, и переписывать его целиком ради
+      # одного файла незачем.
+      - name: Приложить APK к релизу
+        if: startsWith(github.ref, 'refs/tags/')
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const fs = require("fs");
+            const { owner, repo } = context.repo;
+            const tag = context.ref.replace("refs/tags/", "");
+
+            // Черновик по тегу через API не найти — только перебором.
+            const releases = await github.rest.repos.listReleases({ owner, repo, per_page: 100 });
+            const release = releases.data.find((r) => r.tag_name === tag);
+            if (!release) throw new Error(`релиз с тегом ${tag} не найден`);
+
+            const name = process.env.APK_NAME;
+            const path = process.env.APK_PATH;
+
+            // Перезапуск прогона не должен спотыкаться о свой прошлый файл.
+            const already = release.assets.find((a) => a.name === name);
+            if (already) {
+              await github.rest.repos.deleteReleaseAsset({ owner, repo, asset_id: already.id });
+            }
+
+            await github.rest.repos.uploadReleaseAsset({
+              owner,
+              repo,
+              release_id: release.id,
+              name,
+              data: fs.readFileSync(path),
+              headers: {
+                "content-type": "application/vnd.android.package-archive",
+                "content-length": fs.statSync(path).size,
+              },
+            });
+
+            core.info(`${name} приложен к релизу ${tag}`);

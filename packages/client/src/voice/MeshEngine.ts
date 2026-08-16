@@ -24,6 +24,7 @@ import { createAudioContext } from "./audio/devices.ts";
 import { createMicPipeline, type MicPipeline } from "./audio/micPipeline.ts";
 import { keepAwake, type WakeHandle } from "./audio/wake.ts";
 import { apiOrigin } from "../api.ts";
+import { holdVoiceInBackground, releaseVoiceInBackground } from "../native.ts";
 import { UploadError } from "./uploadError.ts";
 import { bitrateFor, captureScreen } from "./screen.ts";
 
@@ -164,6 +165,19 @@ export class MeshEngine implements VoiceEngine {
       this.mixer = new Mixer(this.context);
 
       this.attachVad();
+
+      /*
+        Просим обёртку удержать разговор при сворачивании.
+
+        Именно здесь, а не в начале join: фоновому сервису нужно, чтобы право
+        на микрофон было уже выдано, — иначе Android отказывается его поднимать.
+        К этой строке микрофон захвачен, то есть разрешение точно есть.
+
+        Без await нарочно. Внутри может открыться системный диалог про
+        уведомления, и ждать ответа означало бы задержать вход в канал на то
+        время, пока человек читает вопрос. Ошибки функция разбирает сама.
+      */
+      void holdVoiceInBackground();
     }
 
     this.socket.on((msg) => this.handleServerMessage(msg));
@@ -196,6 +210,11 @@ export class MeshEngine implements VoiceEngine {
 
     this.wake?.stop();
     this.wake = null;
+
+    // Снимаем фоновый режим. Иначе в шторке навсегда останется «Идёт
+    // разговор», а система будет считать микрофон занятым — притом что
+    // говорить уже не с кем.
+    void releaseVoiceInBackground();
 
     // Показ прекращаем явно: иначе браузер оставит гореть индикатор «идёт
     // запись экрана» после того, как человек уже вышел из канала.
