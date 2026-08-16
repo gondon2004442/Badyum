@@ -1935,6 +1935,53 @@
   background: var(--bg-base);
 }
 
+/* Настройка клавиш: слева что делает, справа чем вызывается. */
+.settings__row + .settings__row {
+  margin-top: 8px;
+}
+
+.settings__keyname {
+  flex: 1;
+  min-width: 0;
+  align-self: center;
+  font-size: 13px;
+  color: var(--text-secondary);
+}
+
+.settings__key {
+  flex: 0 0 auto;
+  min-width: 108px;
+  padding: 8px 12px;
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius-md);
+  background: var(--bg-elevated);
+  color: var(--text-primary);
+  /* Моноширинный: это надпись на кнопке клавиатуры, а не слово. */
+  font-family: var(--font-mono);
+  font-size: 11px;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  cursor: pointer;
+}
+
+.settings__key:hover {
+  border-color: var(--accent-lime-dim);
+}
+
+/* Ждём нажатия. Видно должно быть с одного взгляда: пока кнопка в этом
+   состоянии, любая клавиша уйдёт в бинд, а не туда, куда человек привык. */
+.settings__key--wait {
+  border-color: var(--accent-lime);
+  color: var(--accent-lime);
+}
+
+.settings__problem {
+  margin: 8px 0 0;
+  font-size: 12px;
+  line-height: 1.4;
+  color: var(--status-danger);
+}
+
 .settings__note {
   margin: 16px 0 0;
   padding: 8px 10px;

@@ -51,14 +51,88 @@ export async function onGlobalPushToTalk(
   }
 }
 
-/** Какая клавиша реально забинжена под рацию. */
-export async function globalPushToTalkKey(): Promise<string | null> {
+/** Что на что забиндено. Подписи в интерфейсе берутся отсюда, а не из вёрстки. */
+export interface Hotkeys {
+  ptt: string;
+  overlay: string;
+}
+
+/** Клавиши по умолчанию. Продублированы из `hotkeys.rs` для браузера. */
+export const DEFAULT_HOTKEYS: Hotkeys = { ptt: "F8", overlay: "F9" };
+
+/**
+ * Что забиндено на самом деле.
+ *
+ * Спрашиваем обёртку, а не показываем зашитую подпись: клавишу мог занять
+ * другой программой, и тогда написанное на экране расходится с тем, что
+ * работает. Человек жмёт то, что написано, и решает, что сломалось приложение.
+ */
+export async function hotkeys(): Promise<Hotkeys | null> {
   const api = tauri();
   if (!api) return null;
 
   try {
-    return await api.core.invoke<string>("ptt_hotkey");
+    return await api.core.invoke<Hotkeys>("hotkeys");
   } catch {
     return null;
+  }
+}
+
+/**
+ * Переназначить клавиши.
+ *
+ * Обе сразу: проверка «рация и панель не совпадают» имеет смысл, только когда
+ * известны оба значения. Ошибку возвращаем текстом — её показывают человеку,
+ * потому что причин отказа несколько и они разные: занята другой программой,
+ * совпала со второй, не разобралась вовсе.
+ */
+export async function setHotkeys(next: Hotkeys): Promise<Hotkeys> {
+  const api = tauri();
+  if (!api) throw new Error("клавиши настраиваются только в приложении");
+
+  return await api.core.invoke<Hotkeys>("set_hotkeys", {
+    ptt: next.ptt,
+    overlay: next.overlay,
+  });
+}
+
+/** Какая клавиша реально забинжена под рацию. */
+export async function globalPushToTalkKey(): Promise<string | null> {
+  return (await hotkeys())?.ptt ?? null;
+}
+
+/**
+ * Нажали клавишу панели.
+ *
+ * Обёртка только сообщает о нажатии и окно не трогает: показывать панель
+ * уместно лишь в канале, а знает об этом страница. Она и отвечает командой
+ * `setOverlay`. Иначе стало бы возможным состояние «окно ужато, а панели нет».
+ */
+export async function onOverlayToggle(handler: () => void): Promise<() => void> {
+  const api = tauri();
+  if (!api) return () => {};
+
+  try {
+    return await api.event.listen<unknown>("badyum://overlay-toggle", () => handler());
+  } catch {
+    return () => {};
+  }
+}
+
+/**
+ * Ужать окно в панель поверх остальных или вернуть обратно.
+ *
+ * Вся геометрия — на стороне обёртки: странице она недоступна в принципе.
+ */
+export async function setOverlay(on: boolean): Promise<void> {
+  const api = tauri();
+  if (!api) return;
+
+  try {
+    await api.core.invoke("set_overlay", { on });
+  } catch (error) {
+    // Не смогли ужать окно — панель показывать нельзя, иначе человек увидит
+    // обрезанный интерфейс во весь экран и не поймёт, что произошло.
+    throw error instanceof Error ? error : new Error(String(error));
   }
 }

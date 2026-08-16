@@ -9,8 +9,10 @@ import { usePresence } from "./presence.ts";
 import { ChannelScreen } from "./screens/Channel/ChannelScreen.tsx";
 import { HomeScreen } from "./screens/Home/HomeScreen.tsx";
 import { ApiError, createChannel, fetchInviteCode, requestJoin } from "./api.ts";
-import { rememberChannel, type RecentChannel } from "./storage.ts";
+import { rememberChannel, savedHotkeys, type RecentChannel } from "./storage.ts";
 import { nameFor, useAccount } from "./account.ts";
+import { isDesktop, setHotkeys } from "./desktop.ts";
+import { report } from "./report.ts";
 
 interface Session {
   token: string;
@@ -55,6 +57,24 @@ export function App() {
   /** Открыт ли экран смены юза. Первый выбор открывается сам, см. ниже. */
   const [changingUsername, setChangingUsername] = useState(false);
   const presence = usePresence(account);
+
+  /*
+    Возвращаем выбранные клавиши обёртке.
+
+    Обёртка стартует со своими значениями по умолчанию — своего файла настроек
+    у неё нет, и помнить выбор ей негде. Помним мы, поэтому сразу после запуска
+    сообщаем, что человек выбрал в прошлый раз. Ничего не выбирал — молчим,
+    умолчания и так на месте.
+  */
+  useEffect(() => {
+    if (!isDesktop()) return;
+    const saved = savedHotkeys();
+    if (!saved) return;
+
+    // Не смогли занять — не беда: работают клавиши по умолчанию. Но знать об
+    // этом надо, иначе человек жмёт своё сочетание и не понимает, почему тихо.
+    void setHotkeys(saved).catch((error) => report("hotkeys-restore", error));
+  }, []);
 
   const enter = useCallback((next: Session) => {
     rememberChannel({
