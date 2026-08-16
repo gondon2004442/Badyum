@@ -56,3 +56,42 @@ jobs:
       - name: Проверка Rust
         working-directory: apps/desktop/src-tauri
         run: cargo check --locked
+
+  # Android собирается здесь, а не только по тегу. Иначе опечатка в java или
+  # в манифесте всплывала бы в момент выпуска — то есть тогда, когда чинить её
+  # хуже всего.
+  android:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+
+      # AGP 8.13 не собирается на JDK ниже 17.
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 21
+
+      - uses: gradle/actions/setup-gradle@v4
+
+      - run: pnpm install --frozen-lockfile
+
+      # Адрес здесь любой: проверяется, что проект собирается, а не куда он
+      # ходит. Настоящий приезжает из переменной репозитория при выпуске.
+      - name: Синхронизировать проект
+        working-directory: apps/mobile
+        env:
+          BADYUM_SERVER_URL: https://badyum.ru
+        run: npx cap sync android
+
+      - name: Сборка Android
+        working-directory: apps/mobile/android
+        run: |
+          chmod +x gradlew
+          ./gradlew assembleDebug --no-daemon
