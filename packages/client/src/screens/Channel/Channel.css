@@ -1264,6 +1264,52 @@
   font-weight: 700;
 }
 
+/* --- Кадрирование --- */
+
+.crop {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 12px;
+}
+
+/*
+  Окно неподвижно, двигается картинка. Круглая маска поверх показывает, как
+  аватарка будет выглядеть в списках, — но вырезается всё равно квадрат, потому
+  что в канале плитка квадратная.
+*/
+.crop__box {
+  position: relative;
+  overflow: hidden;
+  border-radius: var(--radius-md);
+  background: var(--bg-base);
+  border: 1px solid var(--border-strong);
+  /* Курсор говорит, что двигать можно, ещё до первой попытки. */
+  cursor: grab;
+  /* Иначе браузер на телефоне прокручивает страницу вместо перетаскивания. */
+  touch-action: none;
+  user-select: none;
+}
+
+.crop__box:active {
+  cursor: grabbing;
+}
+
+.crop__img {
+  position: absolute;
+  top: 0;
+  left: 0;
+  transform-origin: 0 0;
+  max-width: none;
+  pointer-events: none;
+}
+
+.crop__zoom {
+  width: 100%;
+  max-width: 240px;
+  accent-color: var(--accent-lime);
+}
+
 .picker__hint {
   margin: 0;
   font-size: 11.5px;
