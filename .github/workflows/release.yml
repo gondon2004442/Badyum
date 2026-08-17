@@ -82,16 +82,19 @@ jobs:
           tagName: ${{ startsWith(github.ref, 'refs/tags/') && github.ref_name || '' }}
           releaseName: ${{ startsWith(github.ref, 'refs/tags/') && format('Badyum {0}', github.ref_name) || '' }}
           releaseBody: |
-            Приложение для компьютера. Всё то же, что на сайте, плюс главное:
-            **рация работает поверх игры** — в браузере горячая клавиша живёт,
-            только пока вкладка в фокусе.
+            Всё то же, что на сайте, плюс то, чего в браузере быть не может:
+            **рация и панель канала работают поверх игры**, а на телефоне
+            **разговор не обрывается**, когда свернул приложение.
 
-            Скачай установщик для своей системы:
+            Система написана прямо в имени файла — бери свою:
 
-            - **Windows** — файл `.msi`
-            - **macOS** — файл `.dmg`
-            - **Linux** — `.AppImage` или `.deb`
-            - **Android** — файл `.apk`
+            - **Windows** — `Badyum-…-Windows.msi`
+            - **macOS** — `Badyum-…-macOS-AppleSilicon.dmg`
+            - **Linux** — `Badyum-…-Linux.AppImage` или `.deb`
+            - **Android** — `Badyum-…-Android.apk`
+
+            `AppleSilicon` в имени не для красоты: сборка идёт под M1 и новее,
+            на интеловом маке она не запустится.
 
             ### Android
 
@@ -189,12 +192,15 @@ jobs:
       - name: Назвать файл по-человечески
         shell: bash
         run: |
-          VERSION="${{ startsWith(github.ref, 'refs/tags/') && github.ref_name || 'dev' }}"
+          # Без «v»: в имени файла она ничего не добавляет, а рядом с номером
+          # версии выглядит как часть названия.
+          VERSION="${{ startsWith(github.ref, 'refs/tags/') && github.ref_name || 'v0.0.0-dev' }}"
+          VERSION="${VERSION#v}"
           mkdir -p dist
           cp apps/mobile/android/app/build/outputs/apk/debug/app-debug.apk \
-             "dist/Badyum_${VERSION}.apk"
-          echo "APK_NAME=Badyum_${VERSION}.apk" >> "$GITHUB_ENV"
-          echo "APK_PATH=dist/Badyum_${VERSION}.apk" >> "$GITHUB_ENV"
+             "dist/Badyum-${VERSION}-Android.apk"
+          echo "APK_NAME=Badyum-${VERSION}-Android.apk" >> "$GITHUB_ENV"
+          echo "APK_PATH=dist/Badyum-${VERSION}-Android.apk" >> "$GITHUB_ENV"
 
       # Кладём и в артефакты прогона: при ручном запуске релиза нет, а
       # проверить сборку всё равно надо.
@@ -242,3 +248,67 @@ jobs:
             });
 
             core.info(`${name} приложен к релизу ${tag}`);
+
+      # Идёт последним: к этому моменту все сборки уже на месте.
+      - name: Подписать файлы по системам
+        if: startsWith(github.ref, 'refs/tags/')
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const { owner, repo } = context.repo;
+            const tag = context.ref.replace("refs/tags/", "");
+            const version = tag.replace(/^v/, "");
+
+            const releases = await github.rest.repos.listReleases({ owner, repo, per_page: 100 });
+            const release = releases.data.find((r) => r.tag_name === tag);
+            if (!release) throw new Error(`релиз с тегом ${tag} не найден`);
+
+            /*
+              Сборщики называют файлы по архитектуре: «amd64.AppImage»,
+              «x64_en-US.msi», «aarch64.dmg». Человеку, пришедшему скачать
+              приложение, это не говорит ничего — он знает, что у него Windows,
+              а не что у него amd64. Приводим к виду, который читается с одного
+              взгляда.
+
+              Архитектура остаётся только у macOS, и не для красоты: раннер
+              собирает под Apple Silicon, и на интеловом маке этот файл не
+              запустится. Умолчать об этом значит отправить человека скачивать
+              заведомо нерабочее.
+            */
+            const NAMES = [
+              [".msi", `Badyum-${version}-Windows.msi`],
+              ["-setup.exe", `Badyum-${version}-Windows-setup.exe`],
+              [".dmg", `Badyum-${version}-macOS-AppleSilicon.dmg`],
+              [".AppImage", `Badyum-${version}-Linux.AppImage`],
+              [".deb", `Badyum-${version}-Linux.deb`],
+              [".rpm", `Badyum-${version}-Linux.rpm`],
+              [".apk", `Badyum-${version}-Android.apk`],
+            ];
+
+            for (const asset of release.assets) {
+              /*
+                Архив для автообновления. Обновлялки у нас нет — приложение
+                качают заново, — и скачивать его незачем, а в списке он выглядит
+                как ещё одна сборка для Mac. Ровно та путаница, от которой
+                избавляемся, поэтому убираем.
+              */
+              if (asset.name.endsWith(".app.tar.gz") || asset.name.endsWith(".sig")) {
+                await github.rest.repos.deleteReleaseAsset({ owner, repo, asset_id: asset.id });
+                core.info(`убран ${asset.name} — это служебный архив обновлялки`);
+                continue;
+              }
+
+              const match = NAMES.find(([suffix]) => asset.name.endsWith(suffix));
+              if (!match) {
+                // Не угадали — оставляем как есть. Переименовать наугад хуже,
+                // чем оставить непонятное имя: так хотя бы видно, что это.
+                core.warning(`не знаю, для какой системы ${asset.name} — оставляю`);
+                continue;
+              }
+
+              const [, name] = match;
+              if (asset.name === name) continue;
+
+              await github.rest.repos.updateReleaseAsset({ owner, repo, asset_id: asset.id, name });
+              core.info(`${asset.name} → ${name}`);
+            }
