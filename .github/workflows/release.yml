@@ -285,6 +285,23 @@ jobs:
               [".apk", `Badyum-${version}-Android.apk`],
             ];
 
+            /*
+              Сначала решаем, что чем станет, и только потом трогаем релиз.
+
+              Разбирать по одному нельзя: в черновике легко оказываются два
+              файла, которым положено одно имя, — например, остаток прошлого
+              прогона и свежая сборка. Переименование во второй такой файл
+              отбивается ошибкой «already_exists», и шаг падает, не доделав
+              остальные. Ровно так он и упал в первый раз.
+
+              Кто из пары лишний, по имени не понять: в одном случае устаревшим
+              оказывается файл со старым именем, в другом — наоборот, уже
+              переименованный прошлым прогоном. Единственный надёжный признак —
+              время создания, по нему и оставляем свежий.
+            */
+            const drop = [];
+            const keep = new Map();
+
             for (const asset of release.assets) {
               /*
                 Архив для автообновления. Обновлялки у нас нет — приложение
@@ -293,8 +310,7 @@ jobs:
                 избавляемся, поэтому убираем.
               */
               if (asset.name.endsWith(".app.tar.gz") || asset.name.endsWith(".sig")) {
-                await github.rest.repos.deleteReleaseAsset({ owner, repo, asset_id: asset.id });
-                core.info(`убран ${asset.name} — это служебный архив обновлялки`);
+                drop.push([asset, "служебный архив обновлялки"]);
                 continue;
               }
 
@@ -307,8 +323,24 @@ jobs:
               }
 
               const [, name] = match;
-              if (asset.name === name) continue;
+              const rival = keep.get(name);
+              if (!rival) {
+                keep.set(name, asset);
+                continue;
+              }
 
+              const older = new Date(rival.created_at) < new Date(asset.created_at) ? rival : asset;
+              keep.set(name, older === rival ? asset : rival);
+              drop.push([older, `дубль ${name} постарше`]);
+            }
+
+            for (const [asset, why] of drop) {
+              await github.rest.repos.deleteReleaseAsset({ owner, repo, asset_id: asset.id });
+              core.info(`убран ${asset.name} — ${why}`);
+            }
+
+            for (const [name, asset] of keep) {
+              if (asset.name === name) continue;
               await github.rest.repos.updateReleaseAsset({ owner, repo, asset_id: asset.id, name });
               core.info(`${asset.name} → ${name}`);
             }
