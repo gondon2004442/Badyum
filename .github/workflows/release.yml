@@ -70,6 +70,27 @@ jobs:
           echo "VITE_BADYUM_SERVER=$SERVER" > packages/client/.env.desktop
           echo "Сервер: $SERVER"
 
+      # Версию приложения Tauri берёт из своего конфига, а не из тега. Пока это
+      # не поправили, свежая сборка выходила с номером первого релиза: файл
+      # назывался v0.3.0, а установленное приложение показывало 0.1.0. Хуже
+      # косметики то, что по этому же номеру Windows решает, обновление перед
+      # ней или переустановка, — с неизменной версией новое поверх старого может
+      # и не встать.
+      - name: Версия из тега
+        if: startsWith(github.ref, 'refs/tags/')
+        shell: bash
+        run: |
+          VERSION="${{ github.ref_name }}"
+          VERSION="${VERSION#v}"
+          node -e '
+            const fs = require("fs");
+            const path = "apps/desktop/src-tauri/tauri.conf.json";
+            const config = JSON.parse(fs.readFileSync(path, "utf8"));
+            config.version = process.argv[1];
+            fs.writeFileSync(path, JSON.stringify(config, null, 2) + "\n");
+          ' "$VERSION"
+          echo "Версия сборки: $VERSION"
+
       - uses: tauri-apps/tauri-action@v0
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
