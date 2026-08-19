@@ -26,6 +26,7 @@ tauri-plugin-log = "2"
 tauri-plugin-global-shortcut = "2"
 tauri-plugin-autostart = "2.5.1"
 tauri-plugin-notification = "2.3.3"
+url = "2.5.8"
 
 # Доступ к микрофону в webview на Linux приходится включать руками, см. lib.rs.
 # Версия закреплена под ту, что тянет сам wry: иначе получим два несовместимых

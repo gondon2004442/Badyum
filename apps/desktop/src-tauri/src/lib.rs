@@ -1,4 +1,5 @@
 mod hotkeys;
+mod login;
 mod overlay;
 mod system;
 mod tray;
@@ -130,7 +131,8 @@ pub fn run() {
             overlay::set_overlay,
             system::notify,
             system::autostart,
-            system::set_autostart
+            system::set_autostart,
+            login::login
         ])
         /*
           Крестик прячет окно, а не закрывает приложение.
@@ -144,6 +146,12 @@ pub fn run() {
         */
         .on_window_event(|window, event| {
             if let tauri::WindowEvent::CloseRequested { api, .. } = event {
+                // Только главное окно. Окно входа закрывается насовсем: прятать
+                // его в трей значило бы оставить висеть страницу Google.
+                if window.label() != "main" {
+                    return;
+                }
+
                 api.prevent_close();
                 let _ = window.hide();
                 system::hint_hidden(window.app_handle());

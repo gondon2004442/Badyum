@@ -1,6 +1,6 @@
 import { useMemo, useState, type FormEvent } from "react";
 import type { CallEndReason, Caller } from "@badyum/shared";
-import { handleOf, loginUrl, nameFor, nameOf, useAccount } from "../../account.ts";
+import { handleOf, startLogin, nameFor, nameOf, useAccount } from "../../account.ts";
 import { useContacts } from "../../contacts.ts";
 import type { PresenceState } from "../../presence.ts";
 import { Contacts } from "./Contacts.tsx";
@@ -172,10 +172,14 @@ export function HomeScreen({
                 </button>
               </>
             ) : account.available ? (
-              <a className="home__account-in" href={loginUrl()}>
+              <button
+                className="home__account-in"
+                onClick={() => void startLogin()}
+                type="button"
+              >
                 <GoogleIcon size={15} />
                 Войти через Google
-              </a>
+              </button>
             ) : null}
           </div>
 
@@ -245,10 +249,10 @@ export function HomeScreen({
               {busy ? "Создаю…" : "Создать канал"}
             </button>
           ) : (
-            <a className="home__primary" href={loginUrl()}>
+            <button className="home__primary" onClick={() => void startLogin()} type="button">
               <GoogleIcon size={15} />
               Войти, чтобы создать канал
-            </a>
+            </button>
           )}
 
           <form className="home__word" onSubmit={submit}>

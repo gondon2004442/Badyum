@@ -11,6 +11,7 @@ import { handleReport } from "./api/report.ts";
 import { handleFile, handleUpload } from "./api/files.ts";
 import { handleAvatar, handleAvatarFile } from "./api/avatar.ts";
 import { json } from "./http.ts";
+import { forged, preflight, withCors } from "./cors.ts";
 import type { Env } from "./env.ts";
 
 export { Registry, ChannelRoom, Presence };
@@ -70,6 +71,28 @@ const statusFor = (error: string): number =>
 export default {
   async fetch(request: Request, env: Env): Promise<Response> {
     const url = new URL(request.url);
+
+    /*
+      Разрешение на межсайтовый запрос — раньше всего остального.
+
+      Десктопное приложение показывает страницу из своих файлов, и origin у неё
+      не наш. Без этого движок окна режет ответ, не показывая причины, и любая
+      ручка выглядит как «сервер не отвечает».
+    */
+    const early = preflight(request, url.origin);
+    if (early) return early;
+
+    if (forged(request, url.origin)) {
+      return withCors(json({ error: "bad_origin" }, 403), request, url.origin);
+    }
+
+    return withCors(await route(request, env, url), request, url.origin);
+  },
+};
+
+/** Собственно маршруты. Разрешения на них навешивает fetch выше. */
+async function route(request: Request, env: Env, url: URL): Promise<Response> {
+  {
     const path = url.pathname;
 
     /**
@@ -312,5 +335,5 @@ export default {
     // Всё остальное — статика клиента. Ссылки-приглашения это пути (/j/x7k2mq),
     // файла по такому пути нет, и SPA-fallback настроен в wrangler.jsonc.
     return env.ASSETS.fetch(request);
-  },
-};
+  }
+}

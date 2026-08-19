@@ -8,7 +8,7 @@ import {
 import { Avatar } from "../../components/Avatar.tsx";
 import type { Caller } from "@badyum/shared";
 import { forgetChannel, type RecentChannel } from "../../storage.ts";
-import { handleOf, loginUrl, nameOf, type Account } from "../../account.ts";
+import { handleOf, startLogin, nameOf, type Account } from "../../account.ts";
 
 interface SidebarProps {
   /** null — мы не в канале: сайдбар тот же, активной строки просто нет. */
@@ -183,10 +183,10 @@ export function Sidebar({
         приводит к «501 не настроено», хуже отсутствующей.
       */}
       {!account && loginAvailable ? (
-        <a className="sidebar__login" href={loginUrl()}>
+        <button className="sidebar__login" onClick={() => void startLogin()} type="button">
           <GoogleIcon size={15} />
           Войти через Google
-        </a>
+        </button>
       ) : null}
 
       <div className="sidebar__me">

@@ -254,6 +254,7 @@ dependencies = [
  "tauri-plugin-global-shortcut",
  "tauri-plugin-log",
  "tauri-plugin-notification",
+ "url",
  "webkit2gtk",
 ]
 
