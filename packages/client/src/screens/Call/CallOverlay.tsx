@@ -41,20 +41,17 @@ export function CallOverlay({ call, onAccept, onHangUp }: CallOverlayProps) {
         </span>
 
         <span className={`callscreen__face${incoming ? " callscreen__face--pulse" : ""}`}>
-          {call.peer.avatarUrl ? (
-            <img
-              className="callscreen__avatar"
-              src={call.peer.avatarUrl}
-              alt=""
-              referrerPolicy="no-referrer"
-            />
-          ) : (
-            <Avatar
-              userId={call.peer.userId}
-              name={nameOf(call.peer)}
-              className="callscreen__avatar"
-            />
-          )}
+          {/*
+            Развилка «картинка или инициалы» живёт в Avatar, и повторять её
+            здесь было ошибкой: этот дубль пропустил доведение адреса до
+            абсолютного, и в приложении на месте лица оставался битый значок.
+          */}
+          <Avatar
+            userId={call.peer.userId}
+            name={nameOf(call.peer)}
+            src={call.peer.avatarUrl}
+            className="callscreen__avatar"
+          />
         </span>
 
         <h1 className="callscreen__name">{nameOf(call.peer)}</h1>

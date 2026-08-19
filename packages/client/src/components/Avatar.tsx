@@ -9,7 +9,12 @@
  * участник всё равно должен опознаваться с одного взгляда — одинаковые серые
  * кружки в канале на шесть человек бесполезны. Цвет выводится из userId,
  * поэтому один и тот же человек всегда одного цвета.
+ *
+ * Здесь же адрес картинки доводится до абсолютного. Это единственное место, где
+ * аватарка становится тегом img, — значит и единственное, где промах виден
+ * сразу; разложи мы это по девяти вызывающим, десятый снова забыли бы.
  */
+import { mediaUrl } from "../api.ts";
 
 const ACCENTS = [
   "var(--accent-lime)",
@@ -50,13 +55,14 @@ interface AvatarProps {
 
 export function Avatar({ userId, name, src, size, dimmed, className }: AvatarProps) {
   const accent = accentFor(userId);
+  const url = mediaUrl(src);
 
-  if (src) {
+  if (url) {
     return (
       <img
         className={className}
         data-avatar=""
-        src={src}
+        src={url}
         alt=""
         /*
           Аватарка бывает с чужого домена (Google), и туда не должно уезжать,
