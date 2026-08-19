@@ -7,7 +7,14 @@ import {
   rememberMyName,
   savedHotkeys,
 } from "../../storage.ts";
-import { DEFAULT_HOTKEYS, hotkeys as readHotkeys, isDesktop, setHotkeys } from "../../desktop.ts";
+import {
+  DEFAULT_HOTKEYS,
+  autostart as readAutostart,
+  hotkeys as readHotkeys,
+  isDesktop,
+  setAutostart,
+  setHotkeys,
+} from "../../desktop.ts";
 import { comboFrom, describeHotkeyProblem, prettyCombo } from "../../hotkey.ts";
 
 interface SettingsPanelProps {
@@ -54,6 +61,8 @@ export function SettingsPanel({
   /** Какую клавишу сейчас переназначаем. `null` — никакую. */
   const [capturing, setCapturing] = useState<"ptt" | "overlay" | null>(null);
   const [keyProblem, setKeyProblem] = useState<string | null>(null);
+  /** `null`, пока не спросили обёртку. В браузере остаётся null навсегда. */
+  const [launch, setLaunch] = useState<boolean | null>(null);
 
   useEffect(() => {
     // Названия устройств браузер отдаёт только после доступа к микрофону —
@@ -69,6 +78,14 @@ export function SettingsPanel({
     void readHotkeys().then((actual) => {
       if (actual) setKeys(actual);
     });
+  }, [desktop]);
+
+  // Состояние автозапуска спрашиваем у системы, а не помним у себя: человек мог
+  // убрать приложение из автозагрузки мимо нас, и показывать «включён» после
+  // этого значило бы врать.
+  useEffect(() => {
+    if (!desktop) return;
+    void readAutostart().then(setLaunch);
   }, [desktop]);
 
   /**
@@ -282,6 +299,42 @@ export function SettingsPanel({
               : "Работают, даже когда окно не в фокусе. Панель видна поверх игры в оконном и безрамочном режиме; в полноэкранном её не показать — это умеет только оверлей, встроенный в саму игру."}
           </p>
           {keyProblem ? <p className="settings__problem">{keyProblem}</p> : null}
+        </div>
+      ) : null}
+
+      {/*
+        Автозапуск. Показываем, только когда обёртка ответила: переключатель в
+        неизвестном состоянии хуже отсутствующего — по нему нельзя понять, как
+        сейчас на самом деле.
+      */}
+      {desktop && launch !== null ? (
+        <div className="settings__group">
+          <span className="settings__label">Запускать с системой</span>
+          <button
+            className={`settings__toggle${launch ? " settings__toggle--on" : ""}`}
+            onClick={() => {
+              const next = !launch;
+              // Рисуем сразу, чтобы нажатие не выглядело проигнорированным, а
+              // при отказе возвращаем обратно — иначе переключатель врал бы.
+              setLaunch(next);
+              void setAutostart(next)
+                .then(() => setNote(next ? "Будет запускаться с системой" : "Автозапуск выключен"))
+                .catch((error: unknown) => {
+                  setLaunch(!next);
+                  setNote(error instanceof Error ? error.message : String(error));
+                });
+            }}
+            role="switch"
+            aria-checked={launch}
+            type="button"
+          >
+            <span className="settings__knob" />
+            <span className="settings__toggle-text">{launch ? "Включено" : "Выключено"}</span>
+          </button>
+          <p className="settings__hint">
+            Badyum поднимется свёрнутым в трей — окно не выскочит, но друзья смогут
+            дозвониться сразу.
+          </p>
         </div>
       ) : null}
 
