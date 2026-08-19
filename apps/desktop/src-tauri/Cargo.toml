@@ -33,3 +33,9 @@ url = "2.5.8"
 # webkit2gtk в одном бинарнике.
 [target.'cfg(target_os = "linux")'.dependencies]
 webkit2gtk = { version = "=2.0.2", features = ["v2_40"] }
+
+# Только для examples/overlay_smoke.rs: mock_context позволяет поднять настоящее
+# окно без собранного фронтенда. В обычную сборку приложения не попадает —
+# dev-зависимости для неё не компилируются вовсе.
+[dev-dependencies]
+tauri = { version = "2.11.3", features = ["test"] }
