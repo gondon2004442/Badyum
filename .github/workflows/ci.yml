@@ -48,7 +48,7 @@ jobs:
         run: |
           sudo apt-get update
           sudo apt-get install -y libwebkit2gtk-4.1-dev build-essential \
-            libxdo-dev libssl-dev libayatana-appindicator3-dev librsvg2-dev
+            libxdo-dev libssl-dev libayatana-appindicator3-dev librsvg2-dev xvfb
 
       - uses: dtolnay/rust-toolchain@stable
       - uses: Swatinem/rust-cache@v2
@@ -58,6 +58,18 @@ jobs:
       - name: Проверка Rust
         working-directory: apps/desktop/src-tauri
         run: cargo check --locked
+
+      # Панель поверх игры зовут тогда, когда окна нет на экране: оно свёрнуто
+      # или спрятано в трей. Один раз она уже сломалась именно здесь — геометрия
+      # менялась исправно, а показать окно забыли, и наружу это выглядело как
+      # «F9 не работает». Типы такого не ловят, поэтому окно поднимается
+      # настоящее и у системы спрашивается, видно его или нет.
+      - name: Панель появляется на экране
+        working-directory: apps/desktop/src-tauri
+        env:
+          WEBKIT_DISABLE_COMPOSITING_MODE: 1
+          WEBKIT_DISABLE_DMABUF_RENDERER: 1
+        run: xvfb-run -a cargo run --locked --example overlay_smoke
 
   # Android собирается здесь, а не только по тегу. Иначе опечатка в java или
   # в манифесте всплывала бы в момент выпуска — то есть тогда, когда чинить её
