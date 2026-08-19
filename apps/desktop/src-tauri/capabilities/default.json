@@ -1,13 +1,15 @@
 {
   "$schema": "../gen/schemas/desktop-schema.json",
   "identifier": "default",
-  "description": "Права окна. start-dragging нужен панели поверх игры: она без рамки, и таскать её больше не за что — шапка помечена data-tauri-drag-region.",
+  "description": "Права окна и системы. start-dragging нужен панели поверх игры: она без рамки, и таскать её больше не за что. notification и autostart — ради того, чтобы свёрнутое в трей приложение оставалось полезным.",
   "windows": [
     "main"
   ],
   "permissions": [
     "core:default",
     "global-shortcut:default",
-    "core:window:allow-start-dragging"
+    "core:window:allow-start-dragging",
+    "notification:default",
+    "autostart:default"
   ]
 }

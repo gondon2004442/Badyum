@@ -24,6 +24,7 @@ import { SettingsPanel, savedInputDevice } from "./SettingsPanel.tsx";
 import {
   globalPushToTalkKey,
   isDesktop,
+  notify,
   onGlobalPushToTalk,
   onOverlayToggle,
   setOverlay as setOverlayWindow,
@@ -264,6 +265,55 @@ export function ChannelScreen({
     },
     [],
   );
+
+  /*
+    Уведомление системы о новом сообщении.
+
+    Заводится вместе со сворачиванием окна в трей: раньше закрытое окно
+    означало закрытое приложение, а теперь оно живёт дальше, и без уведомления
+    человек просто не узнает, что ему написали.
+
+    Отметку держим в ref, а не в состоянии: она не влияет на то, что нарисовано,
+    и лишний перерисовки от неё не нужно.
+  */
+  const notified = useRef<number | null>(null);
+
+  useEffect(() => {
+    if (!desktop) return;
+
+    const count = voice.messages.length;
+
+    /*
+      Первый заход — не повод уведомлять.
+
+      При входе в канал приезжает вся история разом, и без этой отсечки человек
+      получил бы залп уведомлений о разговоре, который шёл без него.
+    */
+    if (notified.current === null) {
+      notified.current = count;
+      return;
+    }
+
+    const previous = notified.current;
+    notified.current = count;
+    if (count <= previous) return;
+
+    // Окно на виду — человек и так всё видит, уведомление было бы шумом.
+    if (typeof document !== "undefined" && document.hasFocus()) return;
+
+    // Свои сообщения не считаются, о них уведомлять некого.
+    const last = voice.messages
+      .slice(previous)
+      .filter((message) => message.userId !== voice.self.selfId)
+      .at(-1);
+    if (!last) return;
+
+    void notify(
+      `${last.displayName} — ${channelName}`,
+      // Картинка без подписи — обычное сообщение, и текста у неё нет.
+      last.text || "Прислал картинку",
+    );
+  }, [desktop, voice.messages, voice.self.selfId, channelName]);
 
   const leave = async () => {
     await voice.leave();

@@ -136,3 +136,43 @@ export async function setOverlay(on: boolean): Promise<void> {
     throw error instanceof Error ? error : new Error(String(error));
   }
 }
+
+/**
+ * Уведомление системы.
+ *
+ * Нужно ровно потому, что окно теперь прячется в трей, а не закрывается:
+ * человек не сидит в приложении и о сообщении иначе не узнает. В браузере
+ * ничего не делает — там вкладка и так на виду, а просить разрешение на
+ * уведомления ради этого незачем.
+ */
+export async function notify(title: string, body: string): Promise<void> {
+  const api = tauri();
+  if (!api) return;
+
+  try {
+    await api.core.invoke("notify", { title, body });
+  } catch {
+    // Уведомления могли запретить системно — это право человека, и настаивать
+    // нам не на чем. Разговор от этого не страдает.
+  }
+}
+
+/** Запускается ли приложение вместе с системой. `null` — мы в браузере. */
+export async function autostart(): Promise<boolean | null> {
+  const api = tauri();
+  if (!api) return null;
+
+  try {
+    return await api.core.invoke<boolean>("autostart");
+  } catch {
+    return null;
+  }
+}
+
+/** Включить или выключить автозапуск. Ошибку показываем: причина бывает разной. */
+export async function setAutostart(on: boolean): Promise<void> {
+  const api = tauri();
+  if (!api) throw new Error("автозапуск настраивается только в приложении");
+
+  await api.core.invoke("set_autostart", { on });
+}

@@ -1,5 +1,7 @@
 mod hotkeys;
 mod overlay;
+mod system;
+mod tray;
 
 use serde::Serialize;
 use tauri::{Emitter, Manager};
@@ -67,6 +69,17 @@ pub fn run() {
     tauri::Builder::default()
         .manage(state)
         .manage(OverlayState::default())
+        .plugin(tauri_plugin_notification::init())
+        .plugin(tauri_plugin_autostart::init(
+            // На macOS автозапуск бывает двух видов. LaunchAgent — обычный, тот
+            // самый список «Открывать при входе»; альтернатива требует прав
+            // администратора, и ради голосового чата это перебор.
+            tauri_plugin_autostart::MacosLauncher::LaunchAgent,
+            // С этим ключом система и запустит приложение. По нему мы отличаем
+            // старт вместе с компьютером от запуска руками: в первом случае
+            // окно показывать нельзя — человек включил машину, а не Badyum.
+            Some(vec![system::HIDDEN_FLAG]),
+        ))
         .plugin(
             tauri_plugin_global_shortcut::Builder::new()
                 .with_handler(|app, shortcut, event| {
@@ -114,8 +127,28 @@ pub fn run() {
         .invoke_handler(tauri::generate_handler![
             hotkeys::hotkeys,
             hotkeys::set_hotkeys,
-            overlay::set_overlay
+            overlay::set_overlay,
+            system::notify,
+            system::autostart,
+            system::set_autostart
         ])
+        /*
+          Крестик прячет окно, а не закрывает приложение.
+
+          Закрыть окно посреди разговора — обычное движение, и обрывать по нему
+          связь значит наказывать человека за привычку. Так же ведут себя
+          Discord и все, кто живёт в трее.
+
+          Выход насовсем остаётся ровно один — пункт в меню трея. Он идёт через
+          app.exit, который сюда не заходит, поэтому взаимной блокировки нет.
+        */
+        .on_window_event(|window, event| {
+            if let tauri::WindowEvent::CloseRequested { api, .. } = event {
+                api.prevent_close();
+                let _ = window.hide();
+                system::hint_hidden(window.app_handle());
+            }
+        })
         .setup(|app| {
             if cfg!(debug_assertions) {
                 app.handle().plugin(
@@ -127,6 +160,23 @@ pub fn run() {
 
             allow_microphone(app.handle());
             hotkeys::register_defaults(app.handle());
+
+            /*
+              Окно объявлено скрытым и показывается здесь.
+
+              Иначе автозапуск выбрасывал бы Badyum на весь экран при каждом
+              включении компьютера — поведение, за которое программы и убирают
+              из автозагрузки. Заодно исчезает вспышка пустого окна перед тем,
+              как страница отрисуется.
+            */
+            if !system::started_hidden() {
+                tray::show(app.handle());
+            }
+
+            // Без значка спрятанное окно стало бы невозвратным.
+            if let Err(error) = tray::install(app.handle()) {
+                log::error!("значок в трее не поднялся: {error}");
+            }
 
             Ok(())
         })
