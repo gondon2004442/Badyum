@@ -29,8 +29,10 @@ jobs:
       - name: Типы
         run: pnpm -r typecheck
 
+      # Все пакеты, а не только server: тесты воркера появились позже, и
+      # прицельный фильтр молча их пропускал.
       - name: Тесты
-        run: pnpm --filter @badyum/server test
+        run: pnpm -r test
 
       - name: Сборка клиента
         run: pnpm --filter @badyum/client build

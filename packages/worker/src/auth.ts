@@ -29,8 +29,24 @@ interface StatePayload {
  */
 const redirectUri = (url: URL) => `${url.origin}/api/auth/google/callback`;
 
+/**
+ * Сессионная кука.
+ *
+ * `SameSite=None` — не послабление, а необходимость. Десктопное приложение
+ * показывает страницу из своих файлов, её origin `tauri://localhost`, и для
+ * браузера обращение к badyum.ru оттуда межсайтовое. С `Lax` кука на такие
+ * запросы не уходит вовсе: человек, вошедший через Google, оставался бы для
+ * сервера гостем, и завести канал из приложения было нельзя.
+ *
+ * То, что `Lax` давал даром — защиту от подделки запроса с чужого сайта, —
+ * теперь делается руками: `forged` в cors.ts отбивает всё, что меняет
+ * состояние и пришло с незнакомого origin. Прочитать ответ чужой сайт не
+ * сможет в любом случае: разрешение мы выдаём поимённо.
+ *
+ * `Secure` обязателен: с `SameSite=None` браузер иначе куку просто не примет.
+ */
 const cookie = (value: string, maxAge: number) =>
-  `${SESSION_COOKIE}=${value}; Path=/; HttpOnly; Secure; SameSite=Lax; Max-Age=${maxAge}`;
+  `${SESSION_COOKIE}=${value}; Path=/; HttpOnly; Secure; SameSite=None; Max-Age=${maxAge}`;
 
 function readCookie(request: Request, name: string): string | null {
   const header = request.headers.get("cookie");

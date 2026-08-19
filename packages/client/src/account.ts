@@ -1,5 +1,6 @@
 import { useCallback, useSyncExternalStore } from "react";
 import { publicOrigin } from "./api.ts";
+import { loginInWindow } from "./desktop.ts";
 import { myName } from "./storage.ts";
 
 export interface Account {
@@ -73,19 +74,30 @@ function set(next: Snapshot): void {
   for (const listener of listeners) listener();
 }
 
+/**
+ * Спросить сервер, кто мы.
+ *
+ * Отдельно от `start`, потому что нужно ещё и после входа: кука к тому моменту
+ * выдана, а состояние на странице о ней не знает.
+ */
+async function refresh(): Promise<void> {
+  try {
+    const response = await fetch(`${publicOrigin()}/api/me`, { credentials: "include" });
+    const data = response.ok ? ((await response.json()) as MeResponse) : null;
+
+    if (data) set({ account: data.user, available: data.googleEnabled, loading: false });
+    else set({ ...snapshot, loading: false });
+  } catch {
+    // Молча: аккаунт — необязательная часть, и её недоступность не должна
+    // мешать человеку зайти в канал по ссылке.
+    set({ ...snapshot, loading: false });
+  }
+}
+
 function start(): void {
   if (started) return;
   started = true;
-
-  void fetch(`${publicOrigin()}/api/me`, { credentials: "include" })
-    .then((r) => (r.ok ? (r.json() as Promise<MeResponse>) : null))
-    .then((data) => {
-      if (data) set({ account: data.user, available: data.googleEnabled, loading: false });
-      else set({ ...snapshot, loading: false });
-    })
-    // Молча: аккаунт — необязательная часть, и её недоступность не должна
-    // мешать человеку зайти в канал по ссылке.
-    .catch(() => set({ ...snapshot, loading: false }));
+  void refresh();
 }
 
 function subscribe(listener: () => void): () => void {
@@ -100,6 +112,36 @@ function subscribe(listener: () => void): () => void {
 export function loginUrl(): string {
   const back = `${location.pathname}${location.search}`;
   return `${publicOrigin()}/api/auth/google?back=${encodeURIComponent(back)}`;
+}
+
+/** Сколько ждём возвращения из окна входа и с какой частотой переспрашиваем. */
+const LOGIN_TRIES = 40;
+const LOGIN_STEP_MS = 1000;
+
+/**
+ * Начать вход.
+ *
+ * В браузере — переход по ссылке, как и было. В приложении ссылка увела бы окно
+ * на сайт и назад не вернула, поэтому вход открывается отдельным окном; оно
+ * закрывается само, как только Google отпустит.
+ *
+ * Дальше переспрашиваем сервер. Событие «вход закончился» пришлось бы тащить
+ * из обёртки отдельным каналом, а вход — действие редкое и заметное: несколько
+ * попыток с паузой стоят дешевле лишнего механизма. Останавливаемся, как
+ * только узнали человека.
+ */
+export async function startLogin(): Promise<void> {
+  const opened = await loginInWindow(loginUrl(), publicOrigin() || location.origin);
+  if (!opened) {
+    location.href = loginUrl();
+    return;
+  }
+
+  for (let attempt = 0; attempt < LOGIN_TRIES; attempt += 1) {
+    await new Promise((resolve) => setTimeout(resolve, LOGIN_STEP_MS));
+    await refresh();
+    if (snapshot.account) return;
+  }
 }
 
 /**

@@ -1,7 +1,7 @@
 import { useEffect, useState, type FormEvent } from "react";
 import { ApiError, previewChannel, requestJoin, type PreviewResponse } from "../../api.ts";
 import { Avatar } from "../../components/Avatar.tsx";
-import { loginUrl, nameOf, useAccount } from "../../account.ts";
+import { startLogin, nameOf, useAccount } from "../../account.ts";
 import { GoogleIcon } from "../../components/Icons.tsx";
 import "./Join.css";
 
@@ -117,10 +117,14 @@ export function JoinScreen({ target, onJoined }: JoinScreenProps) {
         )}
 
         {mustLogIn ? (
-          <a className="join__cta join__cta--login" href={loginUrl()}>
+          <button
+            className="join__cta join__cta--login"
+            onClick={() => void startLogin()}
+            type="button"
+          >
             <GoogleIcon size={16} />
             Войти и создать комнату
-          </a>
+          </button>
         ) : (
           <>
             <input

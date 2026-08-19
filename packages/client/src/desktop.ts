@@ -176,3 +176,20 @@ export async function setAutostart(on: boolean): Promise<void> {
 
   await api.core.invoke("set_autostart", { on });
 }
+
+/**
+ * Вход через Google в отдельном окне.
+ *
+ * В браузере вход — обычный переход по ссылке. В приложении так нельзя:
+ * страница лежит в его файлах, и уведи мы окно на сервер, приложение
+ * превратилось бы в сайт и обратно не вернулось.
+ *
+ * `false` — мы в браузере, надо идти по ссылке как раньше.
+ */
+export async function loginInWindow(url: string, server: string): Promise<boolean> {
+  const api = tauri();
+  if (!api) return false;
+
+  await api.core.invoke("login", { url, server });
+  return true;
+}
