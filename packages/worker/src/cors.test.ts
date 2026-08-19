@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
-import { allowHeaders, forged, known, preflight } from "./cors.ts";
+import { allowHeaders, forged, known, preflight, withCors } from "./cors.ts";
 
 const SELF = "https://badyum.ru";
 
@@ -88,5 +88,41 @@ describe("подделка запроса с чужого сайта", () => {
   it("без origin пропускаем", () => {
     // Его не ставят curl и наши же тесты; браузер на межсайтовом ставит всегда.
     assert.equal(forged(ask("POST", null), SELF), false);
+  });
+});
+
+describe("апгрейд до сокета", () => {
+  const from = (origin: string) =>
+    new Request("https://badyum.ru/presence", { headers: { origin } });
+
+  /*
+    Проверяем именно тождество объекта, а не заголовки.
+
+    Пересобранный ответ выглядит правильно во всём, кроме одного: свойство
+    webSocket в него не переносится, и соединение обрывается сразу после
+    открытия. Снаружи это «связь пропала — переподключаюсь» по кругу, и ни один
+    заголовок об этом не скажет.
+  */
+  it("отдаётся тем же объектом, а не пересобранным", () => {
+    /*
+      Ответ 101 приходится подделывать: ни node, ни рантайм Workers не дают
+      сконструировать его без сокета — «status must be in the range of 200 to
+      599». Это и есть вторая половина поломки: старый код такой ответ не просто
+      обеднял, он падал на попытке его пересобрать.
+    */
+    const upgraded = { status: 101, headers: new Headers() } as unknown as Response;
+    assert.equal(withCors(upgraded, from("http://tauri.localhost"), "https://badyum.ru"), upgraded);
+  });
+
+  it("узнаётся и по свойству webSocket, без опоры на статус", () => {
+    // В рантайме Workers статус у апгрейда всегда 101, но полагаться на одно
+    // это значит зависеть от того, чего в обычном Response нет вовсе.
+    const upgraded = Object.assign(new Response(null), { webSocket: {} });
+    assert.equal(withCors(upgraded, from("tauri://localhost"), "https://badyum.ru"), upgraded);
+  });
+
+  it("обычному ответу разрешение по-прежнему дописывается", () => {
+    const plain = withCors(new Response("{}"), from("http://tauri.localhost"), "https://badyum.ru");
+    assert.equal(plain.headers.get("access-control-allow-origin"), "http://tauri.localhost");
   });
 });

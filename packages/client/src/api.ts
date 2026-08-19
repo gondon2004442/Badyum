@@ -60,6 +60,25 @@ export function apiOrigin(): string {
   return SERVER_ORIGIN;
 }
 
+/**
+ * Адрес картинки, пришедшей с сервера.
+ *
+ * Аватарка бывает двух видов, и различать их обязательно. Свою загруженную
+ * сервер хранит относительным путём — `/api/avatar/<id>`; в браузере он сам
+ * разворачивается в адрес сайта, а в десктопной обёртке страница лежит в
+ * файлах приложения, и тот же путь ведёт в `tauri://localhost/api/avatar/…`,
+ * где нет ничего. Гугловская же приходит абсолютным адресом на чужой хост, и
+ * дописать к ней наш сервер значило бы сломать ровно то, что работало.
+ *
+ * Поэтому дополняем только относительные пути. В браузере `apiOrigin()` пуст,
+ * и путь остаётся прежним — поведение вкладки не меняется вовсе.
+ */
+export function mediaUrl(path: string | null | undefined): string | null {
+  if (!path) return null;
+  if (!path.startsWith("/")) return path;
+  return `${apiOrigin()}${path}`;
+}
+
 async function request<T>(path: string, init?: RequestInit): Promise<T> {
   const response = await fetch(`${SERVER_ORIGIN}${path}`, {
     ...init,
