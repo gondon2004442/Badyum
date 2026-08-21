@@ -124,13 +124,11 @@
   gap: 7px;
   padding: 8px 14px;
   border-radius: var(--radius-md);
-  background: var(--accent-lime);
-  color: var(--bg-base);
-  font-family: var(--font-mono);
-  font-size: 11px;
-  font-weight: 700;
-  letter-spacing: 0.07em;
-  text-transform: uppercase;
+  background: var(--bg-active);
+  border: 1px solid var(--border-strong);
+  color: var(--text-primary);
+  font-size: 13px;
+  font-weight: 600;
   transition: filter 0.15s ease;
 }
 
@@ -185,7 +183,7 @@
    мигающий ореол перетягивает внимание с игры на интерфейс. */
 .tile__ring--speaking {
   border-color: var(--accent-lime);
-  background: rgba(195, 245, 60, 0.07);
+  background: var(--accent-wash);
 }
 
 .tile__avatar {
@@ -225,11 +223,8 @@
   padding: 4px 9px;
   border-radius: var(--radius-sm);
   background: var(--bg-elevated);
-  font-family: var(--font-mono);
   font-size: 10px;
   font-weight: 500;
-  letter-spacing: 0.06em;
-  text-transform: uppercase;
   color: var(--text-muted);
 }
 
@@ -273,10 +268,7 @@
 }
 
 .share__who {
-  font-family: var(--font-mono);
   font-size: 10px;
-  letter-spacing: 0.08em;
-  text-transform: uppercase;
   color: var(--text-muted);
   text-align: center;
   flex-shrink: 0;
@@ -449,11 +441,8 @@
 }
 
 .ptt__label {
-  font-family: var(--font-mono);
   font-size: 10px;
   font-weight: 700;
-  letter-spacing: 0.12em;
-  text-transform: uppercase;
   color: var(--text-secondary);
 }
 
@@ -461,18 +450,12 @@
   display: flex;
   align-items: center;
   gap: 5px;
-  font-family: var(--font-mono);
   font-size: 10px;
-  letter-spacing: 0.05em;
-  text-transform: uppercase;
   color: var(--text-muted);
 }
 
 .ptt__note {
-  font-family: var(--font-mono);
   font-size: 9.5px;
-  letter-spacing: 0.05em;
-  text-transform: uppercase;
   color: var(--text-muted);
   opacity: 0.75;
 }
@@ -497,11 +480,11 @@
 .ctrl {
   display: grid;
   place-items: center;
-  width: 48px;
-  height: 48px;
-  border-radius: var(--radius-md);
-  background: var(--bg-elevated);
-  border: 1px solid var(--border-subtle);
+  width: var(--ctrl-h);
+  height: var(--ctrl-h);
+  border-radius: var(--radius-lg);
+  background: var(--bg-surface);
+  border: 1px solid transparent;
   color: var(--text-primary);
   transition:
     background 0.12s linear,
@@ -513,16 +496,16 @@
   border-color: var(--border-strong);
 }
 
+/* Включённый микрофон — подсветка, а не заливка: цвет остаётся редким. */
 .ctrl--on {
-  background: var(--accent-lime);
-  border-color: var(--accent-lime);
-  color: var(--bg-base);
+  background: var(--accent-soft);
+  border-color: transparent;
+  color: var(--accent);
 }
 
 .ctrl--on:hover {
-  background: var(--accent-lime);
-  border-color: var(--accent-lime);
-  filter: brightness(1.08);
+  background: var(--accent-strong);
+  border-color: transparent;
 }
 
 /* Рация включена, но клавиша не зажата: микрофон готов и молчит. */
@@ -533,7 +516,7 @@
 }
 
 .ctrl--armed:hover {
-  background: rgba(195, 245, 60, 0.1);
+  background: var(--accent-soft);
   border-color: var(--accent-lime);
 }
 
@@ -548,19 +531,17 @@
   gap: 8px;
   width: auto;
   padding: 14px 18px;
-  border-radius: var(--radius-md);
-  background: var(--status-danger);
-  border-color: var(--status-danger);
-  font-family: var(--font-mono);
-  font-size: 11px;
-  font-weight: 700;
-  letter-spacing: 0.07em;
-  text-transform: uppercase;
+  border-radius: var(--radius-lg);
+  background: rgba(255, 107, 120, 0.14);
+  border-color: transparent;
+  color: var(--status-danger);
+  font-size: 13px;
+  font-weight: 600;
 }
 
 .ctrl--leave:hover {
-  background: var(--status-danger);
-  border-color: var(--status-danger);
+  background: rgba(255, 107, 120, 0.22);
+  border-color: transparent;
   filter: brightness(1.08);
 }
 
@@ -574,11 +555,8 @@
 
 .banner {
   padding: 9px var(--space-6);
-  font-family: var(--font-mono);
   font-size: 11px;
   font-weight: 500;
-  letter-spacing: 0.05em;
-  text-transform: uppercase;
   text-align: center;
   flex-shrink: 0;
 }
@@ -688,11 +666,21 @@
 
 /* --- Сайдбар --- */
 
+/*
+ * Колонка навигации — самое тёмное место в приложении: содержимое всегда
+ * светлее её, и глаз идёт туда, где идёт дело. К низу колонка растворяется
+ * в тоне страницы, чтобы граница не выглядела обрубленной.
+ */
 .sidebar {
   display: flex;
   flex-direction: column;
   min-height: 0;
-  background: var(--bg-surface);
+  background: linear-gradient(
+    var(--bg-nav) 0%,
+    var(--bg-nav) 62%,
+    #060606 84%,
+    #0a0a0a 100%
+  );
   border-right: 1px solid var(--border-subtle);
   padding-top: var(--safe-top);
 }
@@ -708,21 +696,20 @@
 .sidebar__mark {
   display: grid;
   place-items: center;
-  width: 28px;
-  height: 28px;
-  border-radius: 3px;
-  background: var(--accent-lime);
-  color: var(--bg-base);
-  font-family: var(--font-mono);
+  width: 34px;
+  height: 34px;
+  border-radius: var(--radius-md);
+  background: var(--bg-active);
+  border: 1px solid var(--border-strong);
+  color: var(--text-primary);
   font-size: 15px;
-  font-weight: 700;
+  font-weight: 800;
 }
 
 .sidebar__wordmark {
-  font-family: var(--font-mono);
-  font-size: 13px;
+  font-size: 12px;
   font-weight: 700;
-  letter-spacing: 0.16em;
+  letter-spacing: 0.18em;
 }
 
 .sidebar__scroll {
@@ -734,26 +721,37 @@
 
 .sidebar__label {
   display: block;
-  padding: 2px 10px 8px;
-  font-family: var(--font-mono);
-  font-size: 9.5px;
-  font-weight: 600;
-  letter-spacing: 0.14em;
+  padding: 2px 13px 10px;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.1em;
   text-transform: uppercase;
-  color: var(--text-muted);
+  color: #6a6a6a;
 }
 
 .chan {
   display: flex;
   align-items: center;
-  gap: 9px;
-  padding: 8px 10px;
-  border-radius: var(--radius-md);
+  gap: 13px;
+  height: var(--row-h);
+  padding: 0 13px;
+  border: 1px solid transparent;
+  border-radius: var(--radius-lg);
   margin-bottom: 2px;
 }
 
-.chan--active {
-  background: var(--bg-elevated);
+.chan:hover {
+  background: #101010;
+}
+
+/*
+ * Активное состояние показывается подложкой, а не цветом текста: кромка
+ * светлее заливки, и плашка читается как поверхность, на которую падает свет.
+ */
+.chan--active,
+.chan--active:hover {
+  background: var(--bg-active);
+  border-color: var(--border-strong);
 }
 
 .chan__open {
@@ -771,21 +769,22 @@
   cursor: not-allowed;
 }
 
+/* Иконка тише текста: строка читается как «текст, а рядом значок». */
 .chan__icon {
   flex-shrink: 0;
-  color: var(--text-muted);
+  color: var(--text-secondary);
 }
 
 .chan--active .chan__icon {
-  color: var(--accent-lime);
+  color: #b6b6bb;
 }
 
 .chan__name {
   flex: 1;
   min-width: 0;
-  font-size: 13px;
+  font-size: 14px;
   font-weight: 500;
-  color: var(--text-secondary);
+  color: var(--text-primary);
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -835,10 +834,7 @@
   padding: 8px 10px;
   border-radius: var(--radius-md);
   border: 1px dashed var(--border-strong);
-  font-family: var(--font-mono);
   font-size: 10.5px;
-  letter-spacing: 0.06em;
-  text-transform: uppercase;
   color: var(--text-secondary);
   /* Гостю на этом месте ссылка входа, а не кнопка: см. Sidebar. */
   text-decoration: none;
@@ -876,15 +872,20 @@
   color: var(--text-primary);
 }
 
+/*
+ * Профиль — отдельная карточка внизу колонки, а не строка под линией: имя,
+ * тег и кнопки читаются одним куском.
+ */
 .sidebar__me {
   display: flex;
   align-items: center;
-  gap: 10px;
-  padding: 12px;
-  border-top: 1px solid var(--border-subtle);
-  background: var(--bg-elevated);
+  gap: 11px;
+  margin: 0 8px 8px;
+  padding: 10px 12px;
+  border-radius: var(--radius-lg);
+  background: #101010;
   flex-shrink: 0;
-  padding-bottom: calc(12px + var(--safe-bottom));
+  margin-bottom: calc(8px + var(--safe-bottom));
 }
 
 .sidebar__avatar {
@@ -944,7 +945,7 @@
   display: flex;
   flex-direction: column;
   min-height: 0;
-  background: var(--bg-surface);
+  background: var(--bg-list);
   border-left: 1px solid var(--border-subtle);
   padding-top: var(--safe-top);
 }
@@ -961,10 +962,7 @@
 .side__tab {
   padding: 6px 12px;
   border-radius: var(--radius-md);
-  font-family: var(--font-mono);
   font-size: 10.5px;
-  letter-spacing: 0.08em;
-  text-transform: uppercase;
   color: var(--text-muted);
 }
 
@@ -979,9 +977,7 @@
   padding: 6px 12px;
   border-radius: var(--radius-md);
   border: 1px solid var(--border-subtle);
-  font-family: var(--font-mono);
   font-size: 10.5px;
-  text-transform: uppercase;
   color: var(--text-secondary);
 }
 
@@ -1122,8 +1118,9 @@
 .chat__send {
   width: 40px;
   border-radius: var(--radius-md);
-  background: var(--accent-lime);
-  color: var(--bg-base);
+  background: var(--accent-soft);
+  border: 1px solid var(--accent-line);
+  color: var(--accent);
   font-size: 16px;
   font-weight: 700;
 }
@@ -1384,10 +1381,7 @@
   place-items: center;
   background: rgba(0, 0, 0, 0.62);
   color: var(--text-primary);
-  font-family: var(--font-mono);
   font-size: 8.5px;
-  letter-spacing: 0.06em;
-  text-transform: uppercase;
   opacity: 0;
   transition: opacity 0.12s ease;
 }
@@ -1661,10 +1655,7 @@
 }
 
 .person__note {
-  font-family: var(--font-mono);
   font-size: 9.5px;
-  letter-spacing: 0.04em;
-  text-transform: uppercase;
   color: var(--text-muted);
   overflow: hidden;
   text-overflow: ellipsis;
@@ -1712,10 +1703,7 @@
   padding: 8px 14px;
   border-radius: var(--radius-md);
   border: 1px solid var(--border-subtle);
-  font-family: var(--font-mono);
   font-size: 10.5px;
-  letter-spacing: 0.06em;
-  text-transform: uppercase;
   color: var(--text-secondary);
 }
 
@@ -1787,11 +1775,8 @@
 }
 
 .settings__title {
-  font-family: var(--font-mono);
   font-size: 11px;
   font-weight: 700;
-  letter-spacing: 0.12em;
-  text-transform: uppercase;
 }
 
 .settings__close {
@@ -1852,11 +1837,8 @@
   border-radius: var(--radius-md);
   background: var(--accent-lime);
   color: var(--bg-base);
-  font-family: var(--font-mono);
   font-size: 10.5px;
   font-weight: 700;
-  letter-spacing: 0.06em;
-  text-transform: uppercase;
   white-space: nowrap;
 }
 
@@ -1987,10 +1969,7 @@
   padding: 8px 10px;
   border-radius: var(--radius-md);
   background: var(--bg-elevated);
-  font-family: var(--font-mono);
   font-size: 10px;
-  letter-spacing: 0.05em;
-  text-transform: uppercase;
   color: var(--accent-mint);
 }
 

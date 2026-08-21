@@ -42,11 +42,8 @@
   border-radius: var(--radius-md);
   background: var(--accent-lime);
   color: var(--bg-base);
-  font-family: var(--font-mono);
   font-size: 12.5px;
   font-weight: 700;
-  letter-spacing: 0.09em;
-  text-transform: uppercase;
   /* Гостю на этом месте ссылка входа, а не кнопка: см. HomeScreen. */
   text-decoration: none;
 }
@@ -169,9 +166,7 @@
 }
 
 .home__card-when {
-  font-family: var(--font-mono);
   font-size: 9.5px;
-  text-transform: uppercase;
   color: var(--text-muted);
   white-space: nowrap;
 }
