@@ -168,9 +168,18 @@ export function ChannelScreen({
   }, [voice.participants, channelName]);
 
   useEffect(() => {
-    void voice.join(token, savedInputDevice(), true, denoiseEnabled()).then(() =>
-      setJoined(true),
-    );
+    void voice
+      .join(token, savedInputDevice(), true, denoiseEnabled())
+      .then(() => setJoined(true))
+      /*
+        Отказ здесь уже обработан: useVoice поймал его и положил в voice.error,
+        человек читает объяснение на экране. Бросает он дальше ради того, чтобы
+        сюда не дошло setJoined — и это правильно, но без catch то же исключение
+        всплывало необработанным отказом промиса. В браузере это строка в
+        консоли, а у нас ещё и запись в сборе ошибок: отказ микрофона — случай
+        частый и обычный, и заваливать им журнал значит перестать его читать.
+      */
+      .catch(() => {});
     // Токен одноразовый: повторный join по нему невозможен и не нужен.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [token]);

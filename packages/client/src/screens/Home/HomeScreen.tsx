@@ -175,10 +175,11 @@ export function HomeScreen({
               <button
                 className="home__account-in"
                 onClick={() => void startLogin()}
+                disabled={account.loggingIn}
                 type="button"
               >
                 <GoogleIcon size={15} />
-                Войти через Google
+                {account.loggingIn ? "Жду Google…" : "Войти через Google"}
               </button>
             ) : null}
           </div>
@@ -249,11 +250,27 @@ export function HomeScreen({
               {busy ? "Создаю…" : "Создать канал"}
             </button>
           ) : (
-            <button className="home__primary" onClick={() => void startLogin()} type="button">
+            <button
+              className="home__primary"
+              onClick={() => void startLogin()}
+              disabled={account.loggingIn}
+              type="button"
+            >
               <GoogleIcon size={15} />
-              Войти, чтобы создать канал
+              {account.loggingIn ? "Жду Google…" : "Войти, чтобы создать канал"}
             </button>
           )}
+
+          {/*
+            Отказ входа надо произнести вслух. Сервер уводит сюда с меткой в
+            адресе, и до этого её никто не читал: человек возвращался на тот же
+            экран без единого слова и жал кнопку снова.
+          */}
+          {account.loginProblem ? (
+            <p className="home__error" role="alert">
+              {account.loginProblem}
+            </p>
+          ) : null}
 
           <form className="home__word" onSubmit={submit}>
             <input
