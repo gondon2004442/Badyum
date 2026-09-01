@@ -62,6 +62,21 @@ export function preflight(request: Request, self: string): Response | null {
 
 /** Дописать разрешение к готовому ответу. Чужому origin ничего не дописываем. */
 export function withCors(response: Response, request: Request, self: string): Response {
+  /*
+    Апгрейд до сокета отдаём как есть.
+
+    Пересобрать его нельзя в принципе: сокет висит на свойстве `webSocket`, а в
+    новый Response оно не переносится — получился бы ответ 101 без сокета, то
+    есть соединение, которое открывается и тут же обрывается. Заголовки CORS
+    здесь и не нужны: браузер применяет их к fetch, а не к WebSocket.
+
+    Проверяем и статус: до Response.webSocket доходит только рантайм Workers, а
+    в тестах на node:test лежит обычный Response, где такого свойства нет.
+  */
+  if (response.status === 101 || (response as { webSocket?: unknown }).webSocket) {
+    return response;
+  }
+
   const origin = request.headers.get("origin");
   if (!known(origin, self)) return response;
 

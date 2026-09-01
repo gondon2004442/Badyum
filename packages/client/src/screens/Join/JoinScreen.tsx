@@ -29,11 +29,22 @@ const NAME_KEY = "badyum:name";
  * чтобы поговорить» убивает такие проекты на старте. Нажатие кнопки заодно
  * служит тем пользовательским жестом, без которого iOS не даст звук.
  */
+/**
+ * Отказы, после которых ждать нечего.
+ *
+ * Их объединяет одно: канала за ссылкой нет и не появится, сколько ни жми.
+ * Всё остальное — сеть отвалилась, сервер икнул — переживается повторной
+ * попыткой, и ради этого экран ломать не надо.
+ */
+const DEAD = new Set(["not_found", "invite_expired", "invite_exhausted", "bad_input"]);
+
 export function JoinScreen({ target, onJoined }: JoinScreenProps) {
   const [preview, setPreview] = useState<PreviewResponse | null>(null);
   const [name, setName] = useState(() => localStorage.getItem(NAME_KEY) ?? "");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  /** Ссылка никуда не ведёт: приглашения показывать нечего. */
+  const [dead, setDead] = useState(false);
   const { account, available } = useAccount();
 
   /**
@@ -51,9 +62,12 @@ export function JoinScreen({ target, onJoined }: JoinScreenProps) {
         if (!cancelled) setPreview(result);
       })
       .catch((err: unknown) => {
-        if (!cancelled) {
-          setError(err instanceof ApiError ? err.message : "Не получилось открыть канал");
-        }
+        if (cancelled) return;
+        setError(err instanceof ApiError ? err.message : "Не получилось открыть канал");
+        // Ссылка мертва — за ней ничего нет и не появится. Это не та ошибка,
+        // которую можно переждать, поэтому она меняет весь экран, а не
+        // дописывает строчку под кнопкой.
+        if (err instanceof ApiError && DEAD.has(err.code)) setDead(true);
       });
     return () => {
       cancelled = true;
@@ -89,6 +103,32 @@ export function JoinScreen({ target, onJoined }: JoinScreenProps) {
    * гость по-прежнему заходит в него, введя одно имя.
    */
   const mustLogIn = preview?.exists === false && !account && available;
+
+  /*
+    Мёртвая ссылка получает свой экран, а не строчку под кнопкой.
+
+    Раньше здесь показывалось полноценное приглашение: «Тебя зовут в голосовой
+    канал», название «канал» вместо настоящего, обнадёживающее «Пока никого —
+    зайди первым», поле для имени и рабочая с виду кнопка. Правду говорила одна
+    мелкая красная строка под ними — и противоречила всему, что было выше.
+    Человек вводил имя, жал кнопку и получал ту же ошибку второй раз.
+  */
+  if (dead) {
+    return (
+      <div className="join">
+        <div className="join__inner">
+          <div className="join__mark">B</div>
+          <span className="join__kicker">Ссылка не работает</span>
+          <h1 className="join__channel">Канала нет</h1>
+          <p className="join__who">{error ?? "Такого канала нет — возможно, ссылка устарела"}</p>
+          <button className="join__cta" type="button" onClick={() => { location.href = "/"; }}>
+            На главную
+          </button>
+          <p className="join__note">Попроси новую ссылку у того, кто тебя звал</p>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="join">
