@@ -18,6 +18,14 @@ import {
 import { comboFrom, describeHotkeyProblem, prettyCombo } from "../../hotkey.ts";
 
 interface SettingsPanelProps {
+  /**
+   * На чём остановить взгляд при открытии.
+   *
+   * Меню профиля ведёт сюда двумя разными строками — «микрофон» и «сменить
+   * имя», — и обе должны попадать в своё поле. Без этого они читались бы как
+   * дубликаты строки «Настройки»: одна и та же панель, открытая одинаково.
+   */
+  focus?: "name" | "device";
   selfName: string;
   onClose: () => void;
   onRename: (name: string) => void;
@@ -41,6 +49,7 @@ const DEVICE_KEY = "badyum:input-device";
  * сломанной.
  */
 export function SettingsPanel({
+  focus,
   selfName,
   onClose,
   onRename,
@@ -135,6 +144,20 @@ export function SettingsPanel({
     window.addEventListener("keydown", onKey, { capture: true });
     return () => window.removeEventListener("keydown", onKey, { capture: true });
   }, [capturing, keys]);
+
+  /*
+    Наводим фокус после отрисовки, а не в разметке через autoFocus: панель
+    появляется поверх содержимого, и браузер должен сначала её показать.
+  */
+  useEffect(() => {
+    if (!focus) return;
+    const id = focus === "name" ? "settings-name" : "settings-device";
+    const field = document.getElementById(id);
+    if (field instanceof HTMLElement) {
+      field.focus();
+      field.scrollIntoView({ block: "center" });
+    }
+  }, [focus]);
 
   const submitName = (event: FormEvent) => {
     event.preventDefault();

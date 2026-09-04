@@ -1,14 +1,15 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { fetchInviteCode, publicOrigin } from "../../api.ts";
+import type { Caller } from "@badyum/shared";
 import type { ConnectionQuality } from "../../voice/VoiceEngine.ts";
 import { usePushToTalk, useVoice } from "../../voice/useVoice.ts";
 import { Avatar } from "../../components/Avatar.tsx";
 import {
-  ExitIcon,
   HeadphonesIcon,
   LinkIcon,
   MicIcon,
   MicOffIcon,
+  PhoneOffIcon,
   ScreenIcon,
   ScreenOffIcon,
   SpeakerIcon,
@@ -21,6 +22,9 @@ import { Sidebar } from "./Sidebar.tsx";
 import { ChatPanel } from "./ChatPanel.tsx";
 import { PeoplePanel } from "./PeoplePanel.tsx";
 import { SettingsPanel, savedInputDevice } from "./SettingsPanel.tsx";
+import { ProfileMenu } from "./ProfileMenu.tsx";
+import { AvatarPicker } from "../Home/AvatarPicker.tsx";
+import { listInputDevices } from "../../voice/audio/devices.ts";
 import {
   globalPushToTalkKey,
   isDesktop,
@@ -48,6 +52,8 @@ interface ChannelScreenProps {
   selfName: string;
   onLeave: () => void;
   onOpenChannel: (channel: RecentChannel) => void;
+  /** Уйти в личные переписки, не выходя из канала. */
+  onOpenDirect: (peer: Caller) => void;
   onNewChannel: () => void;
 }
 
@@ -89,6 +95,7 @@ export function ChannelScreen({
   selfName,
   onLeave,
   onOpenChannel,
+  onOpenDirect,
   onNewChannel,
 }: ChannelScreenProps) {
   const voice = useVoice();
@@ -101,7 +108,13 @@ export function ChannelScreen({
   const [mobileView, setMobileView] = useState<"stage" | "panel">("stage");
   const isNarrow = useIsNarrow();
   const [storageTick, setStorageTick] = useState(0);
-  const [settingsOpen, setSettingsOpen] = useState(false);
+  /** Панель настроек. Строка, а не флаг: меню профиля открывает её на поле. */
+  const [settingsOpen, setSettingsOpen] = useState<"name" | "device" | "all" | null>(null);
+  const [profileOpen, setProfileOpen] = useState(false);
+  /** Выбор аватарки. Открывается из меню профиля — как и на домашнем экране. */
+  const [pickingAvatar, setPickingAvatar] = useState(false);
+  /** Как называется выбранный микрофон — для строки в меню профиля. */
+  const [deviceName, setDeviceName] = useState<string | null>(null);
   /** Сколько сообщений было, когда чат последний раз смотрели. */
   const [seenCount, setSeenCount] = useState(0);
   /** Имя может меняться на лету, поэтому живёт в состоянии, а не в пропсе. */
@@ -141,6 +154,42 @@ export function ChannelScreen({
   };
 
   const recent = useMemo(() => recentChannels(), [storageTick, channelId]);
+  /** Один в канале: пока это так, главное действие — позвать кого-нибудь. */
+  const alone = voice.participants.length === 0;
+
+  /*
+    Кто в канале — для списка в сайдбаре.
+
+    Себя добавляем последним и вручную: движок держит нас отдельно от
+    собеседников, а в списке «кто здесь» человек ищет и себя тоже — иначе
+    непонятно, засчитан ли твой вход вообще.
+  */
+  const people = useMemo(
+    () => [
+      ...voice.participants,
+      {
+        userId: voice.self.selfId ?? "self",
+        identityId: identity,
+        displayName: myName,
+        avatarUrl: account.account?.avatarUrl ?? null,
+        muted: voice.self.muted,
+        deafened: voice.self.deafened,
+        speaking: voice.self.speaking,
+        sharing: voice.self.sharing,
+      },
+    ],
+    [
+      voice.participants,
+      voice.self.selfId,
+      voice.self.muted,
+      voice.self.deafened,
+      voice.self.speaking,
+      voice.self.sharing,
+      identity,
+      myName,
+      account.account?.avatarUrl,
+    ],
+  );
 
   /**
    * Чат виден, только когда открыта его вкладка — и на телефоне ещё и когда
@@ -166,6 +215,29 @@ export function ChannelScreen({
       });
     }
   }, [voice.participants, channelName]);
+
+  /*
+    Название микрофона спрашиваем, только когда меню открыли.
+
+    До первого getUserMedia браузер отдаёт устройства без имён, а спрашивать их
+    при каждом рендере ради строки, которую человек видит раз в неделю, — лишняя
+    работа на ровном месте.
+  */
+  useEffect(() => {
+    if (!profileOpen) return;
+    let cancelled = false;
+    const saved = savedInputDevice();
+    void listInputDevices()
+      .then((list) => {
+        if (cancelled) return;
+        setDeviceName(list.find((d) => d.deviceId === saved)?.label ?? null);
+      })
+      .catch(() => {});
+    return () => {
+      cancelled = true;
+    };
+  }, [profileOpen]);
+
 
   useEffect(() => {
     void voice
@@ -373,18 +445,53 @@ export function ChannelScreen({
         participantCount={total}
         recent={recent}
         onOpenChannel={onOpenChannel}
+        onOpenDirect={onOpenDirect}
         onNewChannel={onNewChannel}
         onChanged={() => setStorageTick((t) => t + 1)}
+        people={people}
         account={account.account}
         loginAvailable={account.available}
-        onLogout={() => void account.logout()}
-        onOpenSettings={() => setSettingsOpen(true)}
+        onOpenProfile={() => setProfileOpen(true)}
       />
+
+      {profileOpen ? (
+        <ProfileMenu
+          account={account.account}
+          selfName={myName}
+          selfIdentity={identity}
+          loginAvailable={account.available}
+          loggingIn={account.loggingIn}
+          sound={{
+            deviceName,
+            denoised: voice.self.denoised,
+            onDenoise: (on) => void voice.setDenoise(on),
+            openSettings: (focus) => setSettingsOpen(focus ?? "all"),
+          }}
+          /*
+            Панель поверх игры показываем только там, где она бывает: в
+            десктопной обёртке. Тумблер, который не сработает, хуже
+            отсутствующего.
+          */
+          overlay={desktop ? { on: overlayOpen, toggle: toggleOverlay } : null}
+          onPickAvatar={account.account ? () => setPickingAvatar(true) : undefined}
+          onLogout={() => void account.logout()}
+          onClose={() => setProfileOpen(false)}
+        />
+      ) : null}
+
+      {pickingAvatar && account.account ? (
+        <AvatarPicker
+          account={account.account}
+          onClose={() => setPickingAvatar(false)}
+          onChanged={account.setAvatar}
+        />
+      ) : null}
 
       {settingsOpen ? (
         <SettingsPanel
+          focus={settingsOpen === "all" ? undefined : settingsOpen}
           selfName={myName}
-          onClose={() => setSettingsOpen(false)}
+          onClose={() => setSettingsOpen(null)}
           onRename={(name) => {
             voice.rename(name);
             setMyName(name);
@@ -445,7 +552,15 @@ export function ChannelScreen({
             onVolume={(v) => voice.setParticipantVolume(participant.userId, v)}
           />
         ))}
-        {voice.screens.length === 0 ? <InviteTile channelId={channelId} /> : null}
+        {/*
+          Позвать — плиткой, пока ты один.
+
+          В макете её нет вовсе: там канал на четверых, звать некого. Но пока в
+          канале один человек, это главное, что он может сделать, и прятать
+          приглашение за кнопкой в шапке значит заставить его искать. Как только
+          кто-то вошёл, плитка уходит и сцена остаётся людям.
+        */}
+        {alone && voice.screens.length === 0 ? <InviteTile channelId={channelId} /> : null}
       </main>
 
       {shareProblem ? (
@@ -471,21 +586,27 @@ export function ChannelScreen({
       ) : null}
 
       <footer className="controls">
-        <div className="ptt">
+        {/*
+          Рация — переключатель, а не форма с галочкой и двумя подписями.
+
+          Объяснение переехало в подсказку: в браузере оно важное — клавиша
+          работает только в активной вкладке, — но занимать им треть дока
+          несоразмерно тому, как часто его читают.
+        */}
+        <button
+          className={`ptt${pttEnabled ? " ptt--on" : ""}`}
+          onClick={() => setPttEnabled((on) => !on)}
+          aria-pressed={pttEnabled}
+          title={
+            desktop
+              ? "Рация: говоришь, пока клавиша зажата. Работает поверх игры"
+              : "Рация: говоришь, пока клавиша зажата. В браузере — только когда вкладка активна"
+          }
+          type="button"
+        >
           <span className="ptt__label">Рация</span>
-          <label className="ptt__row">
-            <input
-              type="checkbox"
-              checked={pttEnabled}
-              onChange={(e) => setPttEnabled(e.target.checked)}
-            />
-            <span className="ptt__key">{globalKey ?? "CAPS"}</span>
-            удерживай
-          </label>
-          <span className="ptt__note">
-            {desktop ? "работает поверх игры" : "только когда вкладка активна"}
-          </span>
-        </div>
+          <span className="ptt__key">{globalKey ?? "CAPS"}</span>
+        </button>
 
         <div className="controls__group">
           {/* При включённой рации микрофон не выключен, но и не передаёт.
@@ -537,9 +658,20 @@ export function ChannelScreen({
             </button>
           ) : null}
 
-          <button className="ctrl ctrl--leave" onClick={() => void leave()} type="button">
-            <ExitIcon />
-            <span>Выйти</span>
+          {/*
+            Выход — такая же круглая кнопка, как остальные, только красная.
+
+            Текстовой он был шире всех и стоял особняком, хотя это действие того
+            же ряда: положить трубку. Красный цвет и значок говорят достаточно,
+            а подпись остаётся во всплывающей подсказке.
+          */}
+          <button
+            className="ctrl ctrl--leave"
+            onClick={() => void leave()}
+            title="Выйти из канала"
+            type="button"
+          >
+            <PhoneOffIcon />
           </button>
         </div>
 

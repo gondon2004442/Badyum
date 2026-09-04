@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState, type FormEvent } from "react";
 import { publicOrigin } from "../../api.ts";
-import type { Account } from "../../account.ts";
+import { nameOf, type Account } from "../../account.ts";
+import { Avatar } from "../../components/Avatar.tsx";
 import "./Username.css";
 
 interface UsernameScreenProps {
@@ -107,6 +108,30 @@ export function UsernameScreen({ account, onDone, onCancel }: UsernameScreenProp
 
   return (
     <div className="pickname">
+      {/*
+        Левая половина — обещание, ради которого человек сюда шёл.
+
+        Выбор юза сам по себе выглядит формальностью, и на пустом экране с одним
+        полем человек не понимает, зачем он это делает. Рядом стоит то, что он
+        получит, — и шаг перестаёт быть препятствием.
+      */}
+      <aside className="pickname__promise">
+        <div className="pickname__brand">
+          <span className="pickname__mark">B</span>
+          <span className="pickname__word">BADYUM</span>
+        </div>
+        <div className="pickname__pitch">
+          <h2 className="pickname__slogan">
+            Зашёл — <br />
+            уже говоришь
+          </h2>
+          <p className="pickname__lede">
+            Канал живёт всегда: ни дозвона, ни «принять или отклонить». Ссылка
+            вместо звонка, имя вместо регистрации.
+          </p>
+        </div>
+      </aside>
+
       <form className="pickname__card" onSubmit={submit}>
         <span className="pickname__kicker">
           {account.username ? "Смена юза" : "Последний шаг"}
@@ -151,6 +176,29 @@ export function UsernameScreen({ account, onDone, onCancel }: UsernameScreenProp
                   : "От трёх до двадцати символов")}
         </p>
 
+        {/*
+          Так тебя увидят.
+
+          Юз диктуют вслух и по нему ищут, но человек набирает его в пустом поле
+          и не представляет, как он будет выглядеть рядом с именем. Показываем
+          сразу — до того, как он его займёт.
+        */}
+        <div className="pickname__preview">
+          <span className="pickname__preview-label">Так тебя увидят</span>
+          <div className="pickname__card-me">
+            <Avatar
+              userId={account.id}
+              name={nameOf(account)}
+              src={account.avatarUrl}
+              className="pickname__face"
+            />
+            <span className="pickname__me">
+              <span className="pickname__me-name">{nameOf(account)}</span>
+              <span className="pickname__me-tag">@{value.trim() || "юз"}</span>
+            </span>
+          </div>
+        </div>
+
         <div className="pickname__acts">
           {onCancel ? (
             <button className="pickname__later" onClick={onCancel} type="button">
@@ -165,6 +213,11 @@ export function UsernameScreen({ account, onDone, onCancel }: UsernameScreenProp
             {saving ? "Сохраняю…" : "Занять"}
           </button>
         </div>
+
+        <p className="pickname__note">
+          Юз меняется потом, но занимать его придётся заново — свободного никто
+          не держит.
+        </p>
       </form>
     </div>
   );

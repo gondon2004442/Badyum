@@ -6,6 +6,7 @@ import {
   type ClipboardEvent,
   type DragEvent,
   type FormEvent,
+  type ReactNode,
 } from "react";
 import { ATTACHMENT_MAX_BYTES, formatBytes, type Attachment, type ChatMessage } from "@badyum/shared";
 import { Avatar } from "../../components/Avatar.tsx";
@@ -24,6 +25,20 @@ interface ChatPanelProps {
   placeholder?: string;
   /** Чем встречает пустой чат: у канала и у переписки это разные вещи. */
   empty?: string;
+  /**
+   * Как выглядит лента.
+   *
+   * В канале важно, кто сказал: собеседников до восьми, и имя с лицом у каждой
+   * реплики — не украшение. В переписке их двое, имя повторять незачем, и
+   * значение имеет сторона — поэтому пузыри.
+   *
+   * Различается только список. Ввод, вложения, «печатает» и отказы у них общие
+   * и объёмные: разносить их по двум компонентам ради разной ленты значило бы
+   * дублировать самое хрупкое место.
+   */
+  look?: "channel" | "direct";
+  /** Карточка знакомства в начале переписки. Только для `direct`. */
+  intro?: ReactNode;
   /**
    * Куда класть файлы. Без него скрепки нет вовсе: кнопка, которая ответит
    * «не настроено», хуже отсутствующей.
@@ -102,8 +117,35 @@ function groupsOf(messages: ChatMessage[]): ChatMessage[][] {
 const time = (at: number) =>
   new Date(at).toLocaleTimeString("ru", { hour: "2-digit", minute: "2-digit" });
 
+/**
+ * Разделитель дат в переписке: «Вчера», «Сегодня», «12 августа».
+ *
+ * В канале его нет: там разговор идёт здесь и сейчас, и вчерашнее в него не
+ * возвращаются перечитывать. Переписка живёт между звонками, и без дат она
+ * превращается в одну бесконечную ленту, где непонятно, что было когда.
+ */
+function dayOf(at: number): string {
+  const day = new Date(at);
+  const today = new Date();
+  const same = (a: Date, b: Date) => a.toDateString() === b.toDateString();
+
+  if (same(day, today)) return "Сегодня";
+
+  const yesterday = new Date(today);
+  yesterday.setDate(today.getDate() - 1);
+  if (same(day, yesterday)) return "Вчера";
+
+  return day.toLocaleDateString("ru", {
+    day: "numeric",
+    month: "long",
+    ...(day.getFullYear() === today.getFullYear() ? {} : { year: "numeric" }),
+  });
+}
+
 export function ChatPanel({
   messages,
+  look = "channel",
+  intro,
   selfId,
   onSend,
   typing,
@@ -239,9 +281,43 @@ export function ChatPanel({
 
   return (
     <section className="chat">
-      <div className="chat__list" ref={listRef}>
+      <div className={`chat__list${look === "direct" ? " chat__list--direct" : ""}`} ref={listRef}>
+        {intro}
+
         {groups.length === 0 ? (
-          <p className="chat__empty">{empty}</p>
+          intro ? null : <p className="chat__empty">{empty}</p>
+        ) : look === "direct" ? (
+          groups.map((group, index) => {
+            const head = group[0]!;
+            const mine = head.userId === selfId;
+            /* Дату ставим, когда сменился день, — и перед самой первой группой. */
+            const previous = groups[index - 1]?.[0];
+            const newDay =
+              previous === undefined ||
+              new Date(previous.at).toDateString() !== new Date(head.at).toDateString();
+
+            return (
+              <div key={head.id} className="bubbles">
+                {newDay ? <span className="stamp">{dayOf(head.at)}</span> : null}
+                <div className={`bubbles__side${mine ? " bubbles__side--mine" : ""}`}>
+                  {group.map((message) => (
+                    <div key={message.id} className="bubble">
+                      {message.text ? <p className="bubble__text">{message.text}</p> : null}
+                      {message.attachment && channelId ? (
+                        <AttachmentView
+                          attachment={message.attachment}
+                          channelId={channelId}
+                        />
+                      ) : null}
+                    </div>
+                  ))}
+                  {/* Время — одно на группу, под ней: у каждой реплики оно
+                      повторялось бы и мешало читать. */}
+                  <span className="bubbles__time">{time(group[group.length - 1]!.at)}</span>
+                </div>
+              </div>
+            );
+          })
         ) : (
           groups.map((group) => {
             const head = group[0]!;

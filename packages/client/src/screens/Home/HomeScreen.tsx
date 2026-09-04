@@ -5,6 +5,7 @@ import { useContacts } from "../../contacts.ts";
 import type { PresenceState } from "../../presence.ts";
 import { Contacts } from "./Contacts.tsx";
 import { AvatarPicker } from "./AvatarPicker.tsx";
+import { ProfileMenu } from "../Channel/ProfileMenu.tsx";
 import { Sidebar } from "../Channel/Sidebar.tsx";
 import { Avatar } from "../../components/Avatar.tsx";
 import { GoogleIcon, LinkIcon, SpeakerIcon } from "../../components/Icons.tsx";
@@ -77,6 +78,7 @@ export function HomeScreen({
   const [tab, setTab] = useState<Tab>("contacts");
   /** Открыт ли выбор аватарки. Отсюда её и меняют — экран профиля тут. */
   const [pickingAvatar, setPickingAvatar] = useState(false);
+  const [profileOpen, setProfileOpen] = useState(false);
   const showContacts = Boolean(account.account) && tab === "contacts";
 
   const identity = myIdentityId();
@@ -112,11 +114,28 @@ export function HomeScreen({
         onChanged={() => setTick((t) => t + 1)}
         account={account.account}
         loginAvailable={account.available}
-        onLogout={() => void account.logout()}
-        onOpenSettings={() => setTick((t) => t + 1)}
-        onChangeUsername={onChangeUsername}
-        onPickAvatar={() => setPickingAvatar(true)}
+        onOpenProfile={() => setProfileOpen(true)}
       />
+
+      {profileOpen ? (
+        <ProfileMenu
+          account={account.account}
+          selfName={name}
+          selfIdentity={identity}
+          loginAvailable={account.available}
+          loggingIn={account.loggingIn}
+          /*
+            Вне канала звука нет: ни микрофон подменять, ни имя рассылать
+            некому. Строки про него здесь не появляются вовсе — это честнее
+            выключенных.
+          */
+          sound={null}
+          overlay={null}
+          onPickAvatar={account.account ? () => setPickingAvatar(true) : undefined}
+          onLogout={() => void account.logout()}
+          onClose={() => setProfileOpen(false)}
+        />
+      ) : null}
 
       {pickingAvatar && account.account ? (
         <AvatarPicker

@@ -109,6 +109,20 @@ export const BackIcon = named("arrow_back");
 export const CameraIcon = named("photo_camera");
 export const PeopleIcon = named("group");
 export const CheckIcon = named("check", 16);
+/** Шеврон у строки профиля: подсказывает, что за ней раскрывается меню. */
+export const ChevronIcon = named("unfold_more", 18);
+/** Завести канал. Не просто «плюс»: канал заводится вместе со ссылкой на него. */
+export const AddChannelIcon = named("add_link");
+/** Подтверждённый вход: рядом с тем, через что человек вошёл. */
+export const VerifiedIcon = named("verified", 14);
+/** Поиск человека в списке переписок. */
+export const SearchIcon = named("search", 18);
+/** Имя как удостоверение — им человек представляется остальным. */
+export const BadgeIcon = named("badge", 18);
+/** Шумодав. */
+export const NoiseIcon = named("noise_control_off", 18);
+/** Панель поверх игры. */
+export const OverlayIcon = named("picture_in_picture", 18);
 
 /**
  * Логотип Google — исключение. Гайдлайн Google Identity требует использовать
