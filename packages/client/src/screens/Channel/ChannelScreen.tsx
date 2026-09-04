@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { fetchInviteCode, publicOrigin } from "../../api.ts";
+import type { Caller } from "@badyum/shared";
 import type { ConnectionQuality } from "../../voice/VoiceEngine.ts";
 import { usePushToTalk, useVoice } from "../../voice/useVoice.ts";
 import { Avatar } from "../../components/Avatar.tsx";
@@ -51,6 +52,8 @@ interface ChannelScreenProps {
   selfName: string;
   onLeave: () => void;
   onOpenChannel: (channel: RecentChannel) => void;
+  /** Уйти в личные переписки, не выходя из канала. */
+  onOpenDirect: (peer: Caller) => void;
   onNewChannel: () => void;
 }
 
@@ -92,6 +95,7 @@ export function ChannelScreen({
   selfName,
   onLeave,
   onOpenChannel,
+  onOpenDirect,
   onNewChannel,
 }: ChannelScreenProps) {
   const voice = useVoice();
@@ -441,6 +445,7 @@ export function ChannelScreen({
         participantCount={total}
         recent={recent}
         onOpenChannel={onOpenChannel}
+        onOpenDirect={onOpenDirect}
         onNewChannel={onNewChannel}
         onChanged={() => setStorageTick((t) => t + 1)}
         people={people}

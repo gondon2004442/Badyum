@@ -249,12 +249,103 @@
   снизу (см. .stage--aside).
 */
 .share {
+  position: relative;
   display: flex;
   flex-direction: column;
   flex: 1;
   min-height: 0;
   gap: 8px;
   padding: 6px var(--space-6) 0;
+}
+
+/*
+  Предложение посмотреть.
+
+  Фиолетовая подложка здесь уместна ровно по правилу системы: акцент значит
+  «происходит прямо сейчас», а показ экрана — это и есть событие, которого не
+  было секунду назад.
+*/
+.share--offer {
+  align-items: center;
+  justify-content: center;
+  margin: 6px var(--space-6) 0;
+  padding: 0;
+  border: 1px solid var(--accent-line);
+  border-radius: var(--radius-lg);
+  background: linear-gradient(180deg, var(--accent-wash), transparent 70%), var(--bg-base);
+}
+
+.share__tag {
+  position: absolute;
+  top: 18px;
+  left: calc(var(--space-6) + 12px);
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  padding: 5px 10px;
+  border-radius: var(--radius-pill);
+  background: var(--accent-strong);
+  font-family: var(--font-mono);
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--accent);
+}
+
+.share--offer .share__tag {
+  top: 14px;
+  left: 14px;
+}
+
+.share__dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--accent);
+}
+
+.share__ask {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 16px;
+}
+
+.share__icon {
+  display: grid;
+  place-items: center;
+  width: 56px;
+  height: 56px;
+  border-radius: 50%;
+  background: var(--accent-soft);
+  color: var(--accent);
+}
+
+.share__who {
+  font-size: 14px;
+  color: var(--text-secondary);
+}
+
+.share__who b {
+  color: var(--text-primary);
+}
+
+.share__watch {
+  height: 42px;
+  padding: 0 26px;
+  border: 0;
+  border-radius: var(--radius-md);
+  background: var(--accent);
+  color: var(--accent-ink);
+  font: inherit;
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.share__watch:hover {
+  filter: brightness(1.06);
 }
 
 .share__video {
@@ -267,7 +358,7 @@
   background: #000;
 }
 
-.share__who {
+.share__by {
   font-size: 10px;
   color: var(--text-muted);
   text-align: center;
@@ -300,32 +391,40 @@
   Сетка участников во время показа. Плитки становятся мелкими и уходят в один
   ряд с прокруткой: главное сейчас не они.
 */
+/*
+  Полоса участников под показом экрана.
+
+  Размеры из макета: плитка 121×110, лицо 44. Плитки не исчезают вовсе, потому
+  что в разговоре важно видеть, кто говорит, — но и спорить с чужим экраном за
+  внимание им уже не нужно.
+*/
 .stage--aside {
   flex: 0 0 auto;
   display: flex;
-  gap: 8px;
+  gap: 12px;
   align-content: initial;
   overflow-x: auto;
   overflow-y: hidden;
-  padding: 8px var(--space-6);
+  padding: 12px var(--space-6);
 }
 
 .stage--aside .tile {
   flex: 0 0 auto;
-  width: 116px;
+  width: 121px;
+  height: 110px;
   min-height: 0;
-  padding: 10px;
-  gap: 6px;
+  padding: 12px;
+  gap: 10px;
 }
 
 .stage--aside .tile__avatar {
-  width: 38px;
-  height: 38px;
-  font-size: 13px;
+  width: 44px;
+  height: 44px;
+  font-size: 15px;
 }
 
 .stage--aside .tile__name {
-  font-size: 11px;
+  font-size: 12px;
 }
 
 /* Ползунок громкости и подпись статуса в мелкой плитке уже не читаются. */
@@ -781,9 +880,14 @@
   cursor: pointer;
 }
 
-.navrow:hover {
+.navrow:hover:not(:disabled) {
   background: var(--bg-hover);
   color: var(--text-primary);
+}
+
+.navrow:disabled {
+  opacity: 0.42;
+  cursor: default;
 }
 
 /*

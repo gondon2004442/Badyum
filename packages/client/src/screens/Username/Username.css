@@ -7,16 +7,146 @@
 */
 .pickname {
   display: grid;
-  place-items: center;
+  grid-template-columns: 440px minmax(0, 1fr);
   min-height: 100dvh;
-  padding: 24px;
-  padding-bottom: calc(24px + var(--safe-bottom));
   background: var(--bg-base);
 }
 
+/* --- Обещание слева --- */
+
+.pickname__promise {
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  padding: 40px 38px;
+  padding-bottom: calc(40px + var(--safe-bottom));
+  background: var(--bg-nav);
+  border-right: 1px solid var(--border-subtle);
+}
+
+.pickname__brand {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.pickname__mark {
+  display: grid;
+  place-items: center;
+  width: 44px;
+  height: 44px;
+  border-radius: var(--radius-md);
+  background: var(--bg-active);
+  border: 1px solid var(--border-strong);
+  font-size: 18px;
+  font-weight: 800;
+}
+
+.pickname__word {
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.18em;
+}
+
+.pickname__slogan {
+  margin: 0 0 18px;
+  font-size: 34px;
+  line-height: 1.16;
+  font-weight: 800;
+  letter-spacing: -0.01em;
+}
+
+.pickname__lede {
+  max-width: 280px;
+  margin: 0;
+  font-size: 13.5px;
+  line-height: 1.65;
+  color: var(--text-secondary);
+}
+
+/* --- Форма справа --- */
+
 .pickname__card {
+  align-self: center;
+  justify-self: center;
   width: 100%;
-  max-width: 420px;
+  max-width: 380px;
+  padding: 40px 24px;
+  padding-bottom: calc(40px + var(--safe-bottom));
+}
+
+/* --- Как тебя увидят --- */
+
+.pickname__preview {
+  margin: 22px 0 20px;
+}
+
+.pickname__preview-label {
+  display: block;
+  margin-bottom: 8px;
+  font-family: var(--font-mono);
+  font-size: 10.5px;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--text-muted);
+}
+
+.pickname__card-me {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 12px 14px;
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-md);
+  background: var(--bg-surface);
+}
+
+.pickname__face {
+  flex-shrink: 0;
+  width: 38px;
+  height: 38px;
+  border-radius: 50%;
+  font-size: 13px;
+}
+
+.pickname__me {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+
+.pickname__me-name {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--text-primary);
+}
+
+.pickname__me-tag {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  color: var(--accent);
+}
+
+.pickname__note {
+  margin: 14px 0 0;
+  font-size: 11.5px;
+  line-height: 1.55;
+  color: var(--text-muted);
+}
+
+@media (max-width: 860px) {
+  /* Обещание уходит: на телефоне место нужно самой форме. */
+  .pickname {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .pickname__promise {
+    display: none;
+  }
 }
 
 .pickname__kicker {

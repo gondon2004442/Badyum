@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import type { ScreenShare } from "../../voice/VoiceEngine.ts";
+import { ScreenIcon } from "../../components/Icons.tsx";
 
 interface ScreenStageProps {
   screens: ScreenShare[];
@@ -11,26 +12,59 @@ interface ScreenStageProps {
  * Чужой экран во весь канал.
  *
  * Занимает место сетки участников, а не встаёт рядом: показ смотрят, а плитки с
- * инициалами в это время не нужны — они уезжают в узкую полосу сбоку (это
+ * инициалами в это время не нужны — они уезжают в узкую полосу под ним (это
  * делает CSS канала).
+ *
+ * Смотреть начинают нажатием, а не сразу. Чужой экран — это чужой экран: он
+ * прилетает без спроса посреди разговора, забирает собой всю сцену и тянет
+ * трафик. Сначала карточка «такой-то показывает», и только по нажатию — видео.
  */
 export function ScreenStage({ screens, deafened }: ScreenStageProps) {
-  /** Кого смотрим. Обычно показывает один, но запрета на двоих нет. */
+  /** Чей показ мы согласились смотреть. `null` — пока ничей. */
   const [watching, setWatching] = useState<string | null>(null);
 
-  const active =
-    screens.find((s) => s.userId === watching) ?? screens[0] ?? null;
+  const active = screens.find((s) => s.userId === watching) ?? null;
+  /** Кого предлагаем посмотреть, пока не выбрали. */
+  const offered = screens[0] ?? null;
 
-  // Показывавший вышел — переключаемся на того, кто остался, а не остаёмся на
-  // пустом месте.
+  // Показывавший вышел — снимаем выбор, а не остаёмся на пустом месте.
   useEffect(() => {
     if (watching && !screens.some((s) => s.userId === watching)) setWatching(null);
   }, [screens, watching]);
 
-  if (!active) return null;
+  if (!active) {
+    if (!offered) return null;
+    return (
+      <div className="share share--offer">
+        <span className="share__tag">
+          <i className="share__dot" />
+          Показ экрана
+        </span>
+        <div className="share__ask">
+          <span className="share__icon">
+            <ScreenIcon size={26} />
+          </span>
+          <span className="share__who">
+            <b>{offered.displayName}</b> показывает экран
+          </span>
+          <button
+            className="share__watch"
+            onClick={() => setWatching(offered.userId)}
+            type="button"
+          >
+            Смотреть
+          </button>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="share">
+      <span className="share__tag">
+        <i className="share__dot" />
+        Показ экрана
+      </span>
       {screens.length > 1 ? (
         <div className="share__tabs">
           {screens.map((screen) => (
@@ -54,7 +88,7 @@ export function ScreenStage({ screens, deafened }: ScreenStageProps) {
         deafened={deafened}
       />
 
-      <div className="share__who">Показывает {active.displayName}</div>
+      <div className="share__by">Показывает {active.displayName}</div>
     </div>
   );
 }

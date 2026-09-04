@@ -29,9 +29,13 @@ interface SidebarProps {
   people?: Participant[];
   recent: RecentChannel[];
   onOpenChannel: (channel: RecentChannel) => void;
-  /** Открыть раздел личных переписок. */
-  onOpenDirects?: () => void;
-  /** Открыть переписку с конкретным человеком. */
+  /**
+   * Открыть переписку.
+   *
+   * Строка «Личные» ведёт в последнюю: раздел открывается разговором, а список
+   * людей стоит в нём второй колонкой. Нет ни одной переписки — вести некуда, и
+   * строка это показывает, а не молчит после нажатия.
+   */
   onOpenDirect?: (peer: Caller) => void;
   onNewChannel: () => void;
   onChanged: () => void;
@@ -63,7 +67,7 @@ export function Sidebar({
   people = [],
   recent,
   onOpenChannel,
-  onOpenDirects,
+  onOpenDirect,
   onNewChannel,
   onChanged,
   onOpenProfile,
@@ -72,6 +76,8 @@ export function Sidebar({
 }: SidebarProps) {
   const rest = recent.filter((c) => c.channelId !== channelId);
   const others = rest.filter((c) => !c.peer);
+  /** Последняя переписка: в неё и ведёт строка «Личные». */
+  const lastDirect = recent.find((c) => c.peer)?.peer ?? null;
   /** То же правило, что на сервере: право даёт вход, а без входа — не требуется. */
   const canCreate = Boolean(account) || !loginAvailable;
 
@@ -90,8 +96,14 @@ export function Sidebar({
           развернув их здесь, мы утопили бы в них каналы — то есть то, ради чего
           приложение открывают.
         */}
-        {onOpenDirects ? (
-          <button className="navrow" onClick={onOpenDirects} type="button">
+        {onOpenDirect ? (
+          <button
+            className="navrow"
+            onClick={() => lastDirect && onOpenDirect(lastDirect)}
+            disabled={!lastDirect}
+            title={lastDirect ? "Личные переписки" : "Переписок пока нет"}
+            type="button"
+          >
             <ChatIcon size={20} className="navrow__icon" />
             <span className="navrow__name">Личные</span>
           </button>

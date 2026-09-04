@@ -271,8 +271,13 @@ export function App() {
           channelId={session.channelId}
           peer={session.peer}
           online={presence.online.has(session.peer.userId)}
+          onlineIds={presence.online}
+          selfName={nameFor(account)}
           onCall={() => presence.dial(session.peer!)}
           onLeave={leaveSession}
+          onOpenDirect={openDirectWith}
+          onOpenChannel={openChannel}
+          onNewChannel={newChannel}
           busy={presence.call !== null}
         />
       </>
@@ -298,6 +303,7 @@ export function App() {
           else leaveSession();
         }}
         onOpenChannel={openChannel}
+        onOpenDirect={openDirectWith}
         onNewChannel={newChannel}
       />
       </>

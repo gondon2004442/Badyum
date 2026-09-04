@@ -115,6 +115,8 @@ export const ChevronIcon = named("unfold_more", 18);
 export const AddChannelIcon = named("add_link");
 /** Подтверждённый вход: рядом с тем, через что человек вошёл. */
 export const VerifiedIcon = named("verified", 14);
+/** Поиск человека в списке переписок. */
+export const SearchIcon = named("search", 18);
 /** Имя как удостоверение — им человек представляется остальным. */
 export const BadgeIcon = named("badge", 18);
 /** Шумодав. */
