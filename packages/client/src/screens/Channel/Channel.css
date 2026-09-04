@@ -433,48 +433,64 @@
   flex-shrink: 0;
 }
 
+/*
+  Рация: пилюля 120×44 из макета.
+
+  Переключатель, а не форма: галочка с двумя подписями занимала треть дока и
+  читалась как настройка, хотя это то же действие, что и кнопки рядом.
+*/
 .ptt {
   display: flex;
-  flex-direction: column;
-  gap: 2px;
-  min-width: 140px;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  flex-shrink: 0;
+  width: 120px;
+  height: 44px;
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-md);
+  background: var(--bg-base);
+  color: var(--text-secondary);
+  font: inherit;
+  cursor: pointer;
+}
+
+.ptt:hover {
+  border-color: var(--border-strong);
+  color: var(--text-primary);
+}
+
+.ptt--on {
+  border-color: var(--accent-line);
+  background: var(--accent-wash);
+  color: var(--text-primary);
 }
 
 .ptt__label {
-  font-size: 10px;
-  font-weight: 700;
-  color: var(--text-secondary);
-}
-
-.ptt__row {
-  display: flex;
-  align-items: center;
-  gap: 5px;
-  font-size: 10px;
-  color: var(--text-muted);
-}
-
-.ptt__note {
-  font-size: 9.5px;
-  color: var(--text-muted);
-  opacity: 0.75;
+  font-size: 13px;
 }
 
 .ptt__key {
-  padding: 2px 5px;
+  padding: 3px 7px;
   border-radius: var(--radius-sm);
   background: var(--bg-elevated);
   border: 1px solid var(--border-subtle);
-  font-size: 9.5px;
+  font-family: var(--font-mono);
+  font-size: 10px;
   font-weight: 700;
-  letter-spacing: 0.08em;
+  letter-spacing: 0.06em;
   color: var(--text-secondary);
+}
+
+.ptt--on .ptt__key {
+  border-color: var(--accent-line);
+  color: var(--accent);
 }
 
 .controls__group {
   display: flex;
   align-items: center;
-  gap: 10px;
+  gap: 12px;
 }
 
 .ctrl {
@@ -525,18 +541,11 @@
   border-color: var(--status-danger);
 }
 
+/* Такая же круглая, как соседи, — отличается только цветом. */
 .ctrl--leave {
-  display: inline-flex;
-  align-items: center;
-  gap: 8px;
-  width: auto;
-  padding: 14px 18px;
-  border-radius: var(--radius-lg);
   background: rgba(255, 107, 120, 0.14);
-  border-color: transparent;
+  border-color: rgba(255, 107, 120, 0.28);
   color: var(--status-danger);
-  font-size: 13px;
-  font-weight: 600;
 }
 
 .ctrl--leave:hover {
@@ -685,24 +694,28 @@
   padding-top: var(--safe-top);
 }
 
+/* --- Логотип: блок 76 высотой, знак 40 --- */
+
 .sidebar__brand {
   display: flex;
   align-items: center;
-  gap: 10px;
-  padding: 18px;
+  gap: 12px;
+  height: 76px;
+  padding: 0 16px;
+  border-bottom: 1px solid var(--border-subtle);
   flex-shrink: 0;
 }
 
 .sidebar__mark {
   display: grid;
   place-items: center;
-  width: 34px;
-  height: 34px;
+  width: 40px;
+  height: 40px;
   border-radius: var(--radius-md);
   background: var(--bg-active);
   border: 1px solid var(--border-strong);
   color: var(--text-primary);
-  font-size: 15px;
+  font-size: 17px;
   font-weight: 800;
 }
 
@@ -716,227 +729,295 @@
   flex: 1;
   overflow-y: auto;
   min-height: 0;
-  padding: 0 12px;
+  padding: 12px;
 }
 
 .sidebar__label {
   display: block;
-  padding: 2px 13px 10px;
+  padding: 16px 12px 6px;
   font-size: 11px;
   font-weight: 700;
   letter-spacing: 0.1em;
   text-transform: uppercase;
-  color: #6a6a6a;
+  color: var(--text-muted);
 }
 
-.chan {
-  display: flex;
-  align-items: center;
-  gap: 13px;
-  height: var(--row-h);
-  padding: 0 13px;
-  border: 1px solid transparent;
-  border-radius: var(--radius-lg);
-  margin-bottom: 2px;
+.sidebar__line {
+  display: block;
+  height: 1px;
+  background: var(--border-subtle);
+  flex-shrink: 0;
 }
 
-.chan:hover {
-  background: #101010;
+.sidebar__empty {
+  margin: 8px 12px;
+  font-size: 12px;
+  line-height: 1.5;
+  color: var(--text-muted);
 }
 
 /*
- * Активное состояние показывается подложкой, а не цветом текста: кромка
- * светлее заливки, и плашка читается как поверхность, на которую падает свет.
- */
-.chan--active,
-.chan--active:hover {
-  background: var(--bg-active);
-  border-color: var(--border-strong);
-}
+  Строка навигации.
 
-.chan__open {
+  Одна форма на всё: личные, канал, соседний канал, «новый канал». Высота 42 и
+  сетка «иконка 20 — отступ 12 — имя — хвост справа» держат колонку ровной, а
+  разница между строками остаётся смысловой, а не размерной.
+*/
+
+.navrow {
   display: flex;
   align-items: center;
-  gap: 9px;
-  flex: 1;
-  min-width: 0;
+  gap: 12px;
+  width: 100%;
+  height: var(--row-h);
+  padding: 0 12px;
+  border: 1px solid transparent;
+  border-radius: var(--radius-md);
+  background: none;
+  color: var(--text-secondary);
+  font: inherit;
+  font-size: 14px;
   text-align: left;
-  padding: 0;
+  cursor: pointer;
 }
 
-.chan__open:disabled {
-  opacity: 0.45;
-  cursor: not-allowed;
+.navrow:hover {
+  background: var(--bg-hover);
+  color: var(--text-primary);
 }
 
-/* Иконка тише текста: строка читается как «текст, а рядом значок». */
-.chan__icon {
+/*
+  Активное — подложкой с кромкой светлее неё, а не цветом текста.
+
+  Цвет в этой системе значит «здесь что-то происходит»; «ты находишься здесь» —
+  другое утверждение, и красить его акцентом значит спорить с точкой в голосе,
+  стоящей в той же строке.
+*/
+.navrow--on,
+.navrow--on:hover {
+  background: var(--bg-active);
+  border-color: var(--border-strong);
+  color: var(--text-primary);
+  cursor: default;
+}
+
+.navrow__icon {
   flex-shrink: 0;
+  color: var(--text-muted);
+}
+
+.navrow--on .navrow__icon,
+.navrow:hover .navrow__icon {
   color: var(--text-secondary);
 }
 
-.chan--active .chan__icon {
-  color: #b6b6bb;
-}
-
-.chan__name {
+.navrow__name {
   flex: 1;
   min-width: 0;
-  font-size: 14px;
-  font-weight: 500;
-  color: var(--text-primary);
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
 
-.chan--active .chan__name {
-  color: var(--text-primary);
+.navrow--on .navrow__name {
   font-weight: 600;
 }
 
-.chan__count {
-  font-family: var(--font-mono);
-  font-size: 11px;
-  color: var(--text-muted);
+/* Строка с возможностью забыть канал: сама кнопка живёт внутри. */
+.navrow--closable {
+  position: relative;
+  padding: 0;
 }
 
-.chan__forget {
-  padding: 0 4px;
+.navrow__open {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex: 1;
+  min-width: 0;
+  height: 100%;
+  padding: 0 12px;
+  border: 0;
+  background: none;
+  color: inherit;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.navrow__open:disabled {
+  opacity: 0.4;
+  cursor: default;
+}
+
+.navrow__forget {
+  position: absolute;
+  right: 8px;
+  display: grid;
+  place-items: center;
+  width: 22px;
+  height: 22px;
+  border: 0;
+  border-radius: var(--radius-sm);
+  background: none;
+  color: var(--text-muted);
   font-size: 15px;
   line-height: 1;
-  color: var(--text-muted);
   opacity: 0;
-  transition: opacity 0.1s linear;
+  cursor: pointer;
 }
 
-.chan:hover .chan__forget {
+.navrow--closable:hover .navrow__forget {
   opacity: 1;
 }
 
-.chan__forget:hover {
-  color: var(--status-danger);
-}
-
-.sidebar__empty {
-  margin: 4px 10px 0;
-  font-size: 11px;
-  line-height: 1.45;
-  color: var(--text-muted);
-}
-
-.sidebar__new {
-  display: flex;
-  align-items: center;
-  gap: 7px;
-  width: 100%;
-  margin-top: 10px;
-  padding: 8px 10px;
-  border-radius: var(--radius-md);
-  border: 1px dashed var(--border-strong);
-  font-size: 10.5px;
-  color: var(--text-secondary);
-  /* Гостю на этом месте ссылка входа, а не кнопка: см. Sidebar. */
-  text-decoration: none;
-}
-
-.sidebar__new:hover {
-  border-color: var(--accent-lime);
-  color: var(--accent-lime);
-}
-
-/*
-  Вход стоит над строкой «кто я» и упирается в неё: это про одно и то же —
-  кем ты здесь являешься. Отдельной секцией в списке каналов он бы читался
-  как ещё один канал.
-*/
-.sidebar__login {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  gap: 8px;
-  margin: 0 12px 10px;
-  padding: 9px 10px;
-  border-radius: var(--radius-md);
-  border: 1px solid var(--border-strong);
-  background: var(--bg-base);
-  font-size: 12px;
-  font-weight: 600;
-  color: var(--text-secondary);
-  text-decoration: none;
-  flex-shrink: 0;
-}
-
-.sidebar__login:hover {
-  border-color: var(--accent-lime);
+.navrow__forget:hover {
+  background: var(--bg-surface);
   color: var(--text-primary);
 }
 
-/*
- * Профиль — отдельная карточка внизу колонки, а не строка под линией: имя,
- * тег и кнопки читаются одним куском.
- */
+.navrow--add {
+  margin-top: 12px;
+}
+
+/* Линия перед «новым каналом» тянется на всю ширину колонки, а не по полям. */
+.sidebar__scroll .sidebar__line {
+  margin: 12px -12px 0;
+}
+
+/* Точка значит «звук идёт», число — сколько нас. */
+.navlive {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  flex-shrink: 0;
+  font-family: var(--font-mono);
+  font-size: 12px;
+  color: var(--text-secondary);
+}
+
+.navlive__dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--accent);
+}
+
+/* --- Кто в канале: строки под строкой канала --- */
+
+.who {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: 4px 0 6px;
+}
+
+.who__row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  height: 32px;
+  /* Отступ слева больше, чем у канала: список принадлежит строке над ним. */
+  padding: 0 12px 0 22px;
+  color: var(--text-secondary);
+  font-size: 13px;
+}
+
+.who__face {
+  flex-shrink: 0;
+  width: 26px;
+  height: 26px;
+  border-radius: 50%;
+  font-size: 10px;
+}
+
+.who__name {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* Говорит — кольцо у лица и имя ярче: то же, что на плитке в сцене. */
+.who__row--speaking .who__face {
+  box-shadow: 0 0 0 2px var(--accent-ring);
+}
+
+.who__row--speaking .who__name {
+  color: var(--text-primary);
+}
+
+.who__state {
+  flex-shrink: 0;
+  color: var(--text-muted);
+}
+
+.who__state--off {
+  color: var(--status-danger);
+}
+
+/* --- Профиль внизу --- */
+
 .sidebar__me {
   display: flex;
   align-items: center;
   gap: 11px;
-  margin: 0 8px 8px;
-  padding: 10px 12px;
-  border-radius: var(--radius-lg);
-  background: #101010;
+  width: calc(100% - 24px);
+  margin: 0 12px 14px;
+  padding: 11px;
+  border: 1px solid transparent;
+  border-radius: var(--radius-md);
+  background: none;
+  color: inherit;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
   flex-shrink: 0;
-  margin-bottom: calc(8px + var(--safe-bottom));
 }
 
-.sidebar__avatar {
-  display: grid;
-  place-items: center;
-  width: 32px;
-  height: 32px;
-  border-radius: var(--radius-sm);
-  background: var(--bg-base);
-  border: 1px solid currentColor;
-  font-family: var(--font-mono);
+.sidebar__me:hover {
+  background: var(--bg-hover);
+  border-color: var(--border-subtle);
+}
+
+.sidebar__myface {
+  flex-shrink: 0;
+  width: 34px;
+  height: 34px;
+  border-radius: 50%;
   font-size: 12px;
-  font-weight: 700;
-  flex-shrink: 0;
-}
-
-/*
-  Фото приходит чужого размера и пропорций, поэтому object-fit, а не растяжение.
-  Рамка нейтральная: у инициалов цвет несёт смысл (он выведен из идентификатора),
-  у фотографии — нет.
-*/
-.sidebar__avatar--photo {
-  object-fit: cover;
-  border-color: var(--border-strong);
 }
 
 .sidebar__identity {
   display: flex;
   flex-direction: column;
-  gap: 1px;
+  gap: 2px;
   flex: 1;
   min-width: 0;
 }
 
 .sidebar__myname {
-  font-size: 13px;
-  font-weight: 600;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--text-primary);
 }
 
 .sidebar__mytag {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
   font-family: var(--font-mono);
-  font-size: 10px;
+  font-size: 11px;
   color: var(--text-muted);
 }
 
-.sidebar__gear {
+.sidebar__chevron {
+  flex-shrink: 0;
   color: var(--text-muted);
-  opacity: 0.6;
 }
 
 /* --- Правая панель --- */

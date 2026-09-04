@@ -1,14 +1,16 @@
 import {
-  ExitIcon,
-  GoogleIcon,
-  LinkIcon,
-  SlidersIcon,
+  AddChannelIcon,
+  ChatIcon,
+  ChevronIcon,
+  MicOffIcon,
+  ScreenIcon,
   SpeakerIcon,
+  WaveIcon,
 } from "../../components/Icons.tsx";
 import { Avatar } from "../../components/Avatar.tsx";
-import type { Caller } from "@badyum/shared";
+import type { Caller, Participant } from "@badyum/shared";
 import { forgetChannel, type RecentChannel } from "../../storage.ts";
-import { handleOf, startLogin, nameOf, type Account } from "../../account.ts";
+import { handleOf, nameOf, type Account } from "../../account.ts";
 
 interface SidebarProps {
   /** null — мы не в канале: сайдбар тот же, активной строки просто нет. */
@@ -17,22 +19,28 @@ interface SidebarProps {
   selfName: string;
   selfIdentity: string;
   participantCount: number;
+  /**
+   * Кто сейчас в активном канале.
+   *
+   * Список живёт под строкой канала, а не только на сцене: свернув приложение
+   * в узкое окно или уйдя в переписку, человек всё равно должен видеть, кто
+   * рядом. Пустой — мы не в канале.
+   */
+  people?: Participant[];
   recent: RecentChannel[];
   onOpenChannel: (channel: RecentChannel) => void;
-  /** Открыть переписку с человеком. Отдельно: у неё своё лицо и свой раздел. */
+  /** Открыть раздел личных переписок. */
+  onOpenDirects?: () => void;
+  /** Открыть переписку с конкретным человеком. */
   onOpenDirect?: (peer: Caller) => void;
   onNewChannel: () => void;
   onChanged: () => void;
-  onOpenSettings: () => void;
-  /** Сменить юз. Необязателен: из канала за этим не ходят. */
-  onChangeUsername?: () => void;
-  /** Сменить аватарку. Нет — свой аватар остаётся просто картинкой. */
-  onPickAvatar?: () => void;
+  /** Раскрыть меню профиля. Там же вход, настройки и выход. */
+  onOpenProfile: () => void;
   /** Аккаунт, если человек вошёл. Гость — null, и это нормальный режим. */
   account: Account | null;
   /** Настроен ли вход. Кнопку, которая не сработает, показывать нельзя. */
   loginAvailable: boolean;
-  onLogout: () => void;
 }
 
 /**
@@ -41,6 +49,10 @@ interface SidebarProps {
  * Каналы в списке — не серверная сущность, а память этого браузера: сервер
  * держит их в памяти процесса и никого не опознаёт. Поэтому «мои каналы» —
  * это ровно те, куда ты заходил с этого устройства.
+ *
+ * Колонка темнее содержимого нарочно: глаз должен цепляться за разговор, а не
+ * за меню. По той же причине активная строка показана подложкой, а не цветом
+ * текста, — цвет здесь значит «происходит прямо сейчас».
  */
 export function Sidebar({
   channelName,
@@ -48,22 +60,17 @@ export function Sidebar({
   selfName,
   selfIdentity,
   participantCount,
+  people = [],
   recent,
   onOpenChannel,
-  onOpenDirect,
+  onOpenDirects,
   onNewChannel,
   onChanged,
-  onOpenSettings,
-  onChangeUsername,
-  onPickAvatar,
+  onOpenProfile,
   account,
   loginAvailable,
-  onLogout,
 }: SidebarProps) {
-  // Личные переписки и каналы — два разных списка. Вперёд идут люди: к ним
-  // возвращаются чаще, чем в комнату по кодовому слову.
   const rest = recent.filter((c) => c.channelId !== channelId);
-  const directs = rest.filter((c) => c.peer);
   const others = rest.filter((c) => !c.peer);
   /** То же правило, что на сервере: право даёт вход, а без входа — не требуется. */
   const canCreate = Boolean(account) || !loginAvailable;
@@ -77,176 +84,139 @@ export function Sidebar({
 
       <div className="sidebar__scroll">
         {/*
-          Личные переписки впереди каналов: к людям возвращаются чаще, чем в
-          комнату по кодовому слову. Раздела нет вовсе, пока переписок нет —
-          пустой заголовок только занимал бы место.
-        */}
-        {directs.length > 0 && onOpenDirect ? (
-          <div className="sidebar__section">
-            <span className="sidebar__label">Личные</span>
+          Личные — одна строка, а не список имён.
 
-            {directs.map((chat) => (
-              <div key={chat.channelId} className="chan">
-                <button
-                  className="chan__open"
-                  onClick={() => onOpenDirect(chat.peer!)}
-                  title={`Переписка с ${nameOf(chat.peer!)}`}
-                  type="button"
-                >
-                  <Avatar
-                    userId={chat.peer!.userId}
-                    name={nameOf(chat.peer!)}
-                    src={chat.peer!.avatarUrl}
-                    className="chan__face"
-                  />
-                  <span className="chan__name">{nameOf(chat.peer!)}</span>
-                </button>
-                <button
-                  className="chan__forget"
-                  onClick={() => {
-                    forgetChannel(chat.channelId);
-                    onChanged();
-                  }}
-                  title="Убрать из списка"
-                  type="button"
-                >
-                  ×
-                </button>
-              </div>
-            ))}
-          </div>
+          Имена живут в своей колонке: в списке их бывает три десятка, и
+          развернув их здесь, мы утопили бы в них каналы — то есть то, ради чего
+          приложение открывают.
+        */}
+        {onOpenDirects ? (
+          <button className="navrow" onClick={onOpenDirects} type="button">
+            <ChatIcon size={20} className="navrow__icon" />
+            <span className="navrow__name">Личные</span>
+          </button>
         ) : null}
 
-        <div className="sidebar__section">
-          <span className="sidebar__label">Голосовые каналы</span>
+        <span className="sidebar__label">Голосовые каналы</span>
 
-          {channelName !== null ? (
-            <div className="chan chan--active">
-              <SpeakerIcon size={16} className="chan__icon" />
-              <span className="chan__name">{channelName}</span>
-              <span className="chan__count">{participantCount}</span>
+        {channelName !== null ? (
+          <>
+            <div className="navrow navrow--on">
+              <WaveIcon size={20} className="navrow__icon" />
+              <span className="navrow__name">{channelName}</span>
+              {/* Точка значит «звук идёт прямо сейчас», число — сколько нас. */}
+              <span className="navlive">
+                <i className="navlive__dot" />
+                {participantCount}
+              </span>
             </div>
-          ) : null}
 
-          {others.map((channel) => (
-            <div key={channel.channelId} className="chan">
-              <button
-                className="chan__open"
-                onClick={() => onOpenChannel(channel)}
-                title={channel.code ? "Вернуться в канал" : "Ссылка утеряна"}
-                disabled={!channel.code}
-                type="button"
-              >
-                <SpeakerIcon size={16} className="chan__icon" />
-                <span className="chan__name">{channel.name}</span>
-              </button>
-              <button
-                className="chan__forget"
-                onClick={() => {
-                  forgetChannel(channel.channelId);
-                  onChanged();
-                }}
-                title="Убрать из списка"
-                type="button"
-              >
-                ×
-              </button>
-            </div>
-          ))}
+            {/*
+              Кто в канале — прямо под его строкой.
 
-          {others.length === 0 ? (
-            <p className="sidebar__empty">
-              {channelName === null
-                ? "Каналы появятся здесь, когда ты в них зайдёшь"
-                : "Другие каналы появятся здесь, когда ты в них зайдёшь"}
-            </p>
-          ) : null}
+              Это состояние, а не навигация: строки не нажимаются, потому что
+              нажать на человека в голосе не на что. Гостю, пришедшему по
+              ссылке, некуда и написать — аккаунта у него нет.
+            */}
+            {people.length > 0 ? (
+              <div className="who">
+                {people.map((person) => (
+                  <div
+                    key={person.userId}
+                    className={`who__row${person.speaking ? " who__row--speaking" : ""}`}
+                  >
+                    <Avatar
+                      userId={person.userId}
+                      name={person.displayName}
+                      src={person.avatarUrl}
+                      className="who__face"
+                    />
+                    <span className="who__name">{person.displayName}</span>
+                    {person.sharing ? (
+                      <ScreenIcon size={16} className="who__state" />
+                    ) : null}
+                    {person.muted ? (
+                      <MicOffIcon size={16} className="who__state who__state--off" />
+                    ) : null}
+                  </div>
+                ))}
+              </div>
+            ) : null}
+          </>
+        ) : null}
 
-          {/*
-            Заводить каналы могут только вошедшие — иначе каталог разносится
-            циклом в консоли. Гостю кнопку не показываем вовсе: предложение
-            войти уже стоит ниже, в этой же колонке, и второе такое же рядом
-            читалось бы как другое действие. На вход по чужой ссылке запрет не
-            влияет — там кнопка и не нужна.
-          */}
-          {canCreate ? (
-            <button className="sidebar__new" onClick={onNewChannel} type="button">
-              <LinkIcon size={14} />
-              Новый канал
+        {others.map((channel) => (
+          <div key={channel.channelId} className="navrow navrow--closable">
+            <button
+              className="navrow__open"
+              onClick={() => onOpenChannel(channel)}
+              title={channel.code ? "Вернуться в канал" : "Ссылка утеряна"}
+              disabled={!channel.code}
+              type="button"
+            >
+              <SpeakerIcon size={20} className="navrow__icon" />
+              <span className="navrow__name">{channel.name}</span>
             </button>
-          ) : null}
-        </div>
+            {/*
+              Убрать из списка можно, но кнопка появляется под курсором: в покое
+              она добавляла бы к каждой строке крестик, которого в макете нет и
+              который читается как «закрыть канал», а не «забыть».
+            */}
+            <button
+              className="navrow__forget"
+              onClick={() => {
+                forgetChannel(channel.channelId);
+                onChanged();
+              }}
+              title="Убрать из списка"
+              type="button"
+            >
+              ×
+            </button>
+          </div>
+        ))}
+
+        {others.length === 0 && channelName === null ? (
+          <p className="sidebar__empty">Каналы появятся здесь, когда ты в них зайдёшь</p>
+        ) : null}
+        {canCreate ? (
+          <>
+            <span className="sidebar__line" />
+            <button className="navrow navrow--add" onClick={onNewChannel} type="button">
+              <AddChannelIcon size={20} className="navrow__icon" />
+              <span className="navrow__name">Новый канал</span>
+            </button>
+          </>
+        ) : null}
       </div>
 
       {/*
-        Вход предлагаем только гостю и только если он настроен. Кнопка, которая
-        приводит к «501 не настроено», хуже отсутствующей.
+        Строка профиля — вход в меню, а не витрина.
+
+        Раньше рядом с именем висели шестерёнка и выход, и обе кричали одинаково
+        громко, хотя выход нужен раз в жизни. Теперь здесь только «кто я», а всё
+        остальное — за одним нажатием.
       */}
-      {!account && loginAvailable ? (
-        <button className="sidebar__login" onClick={() => void startLogin()} type="button">
-          <GoogleIcon size={15} />
-          Войти через Google
-        </button>
-      ) : null}
-
-      <div className="sidebar__me">
-        {/*
-          Инициалы и цвет берём от того же, чьё имя написано рядом: иначе у
-          вошедшего под ником dumax в квадрате оставалось «ГО» от гостя.
-
-          Вошедшему это ещё и кнопка: аватарку меняют отсюда. Гостю менять
-          нечего — картинка принадлежит аккаунту, которого у него нет.
-        */}
-        {account && onPickAvatar ? (
-          <button
-            className="sidebar__face"
-            onClick={onPickAvatar}
-            title="Сменить аватарку"
-            type="button"
-          >
-            <Avatar
-              userId={account.id}
-              name={nameOf(account)}
-              src={account.avatarUrl}
-              className="sidebar__avatar"
-            />
-            <span className="sidebar__face-hint">сменить</span>
-          </button>
-        ) : (
-          <Avatar
-            userId={account?.id ?? selfIdentity}
-            name={account ? nameOf(account) : selfName}
-            src={account?.avatarUrl}
-            className="sidebar__avatar"
-          />
-        )}
-        <div className="sidebar__identity">
+      <button className="sidebar__me" onClick={onOpenProfile} type="button">
+        <Avatar
+          userId={account?.id ?? selfIdentity}
+          name={account ? nameOf(account) : selfName}
+          src={account?.avatarUrl}
+          className="sidebar__myface"
+        />
+        <span className="sidebar__identity">
           <span className="sidebar__myname">{account ? nameOf(account) : selfName}</span>
           <span className="sidebar__mytag">
             {/*
               У гостя тег — обрезок локального идентификатора: он ничего не
-              подтверждает и живёт только в этом браузере. У вошедшего — настоящий,
-              выданный сервисом, и по нему человека можно найти.
+              подтверждает и живёт только в этом браузере. У вошедшего —
+              настоящий, выданный сервисом, и по нему человека можно найти.
             */}
-            {account
-              ? (handleOf(account) ?? "юз не выбран")
-              : `#${selfIdentity.slice(0, 4)}`}
+            {account ? (handleOf(account) ?? "юз не выбран") : `#${selfIdentity.slice(0, 4)}`}
           </span>
-        </div>
-        {account ? (
-          <button
-            className="sidebar__gear"
-            onClick={onLogout}
-            title={`Выйти из аккаунта ${nameOf(account)}`}
-            type="button"
-          >
-            <ExitIcon size={16} />
-          </button>
-        ) : null}
-        <button className="sidebar__gear" onClick={onOpenSettings} title="Настройки" type="button">
-          <SlidersIcon size={16} />
-        </button>
-      </div>
+        </span>
+        <ChevronIcon size={18} className="sidebar__chevron" />
+      </button>
     </aside>
   );
 }

@@ -1,0 +1,246 @@
+/*
+  Меню профиля.
+
+  Раскрывается вверх от строки профиля, а не в центре экрана: оно принадлежит
+  этому углу, и вылет в середину читался бы как отдельное окно, из которого
+  надо «вернуться».
+*/
+
+.profile {
+  position: fixed;
+  inset: 0;
+  z-index: 60;
+}
+
+.profile__card {
+  position: absolute;
+  left: 12px;
+  bottom: 84px;
+  display: flex;
+  flex-direction: column;
+  width: 288px;
+  max-width: calc(100vw - 24px);
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius-lg);
+  background: var(--bg-surface);
+  /* Тень нужна, чтобы карточка отделилась от почти такой же тёмной колонки. */
+  box-shadow: 0 18px 44px rgba(0, 0, 0, 0.62);
+  overflow: hidden;
+}
+
+.profile__line {
+  height: 1px;
+  background: var(--border-subtle);
+}
+
+/* --- Кто я --- */
+
+.profile__who {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 14px;
+}
+
+.profile__face {
+  flex-shrink: 0;
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  font-size: 14px;
+}
+
+.profile__id {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  flex: 1;
+  min-width: 0;
+}
+
+.profile__name {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--text-primary);
+}
+
+.profile__tag {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-family: var(--font-mono);
+  font-size: 11px;
+  color: var(--text-muted);
+}
+
+.profile__via {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  flex-shrink: 0;
+  padding: 4px 8px;
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-pill);
+  font-family: var(--font-mono);
+  font-size: 10px;
+  letter-spacing: 0.08em;
+  color: var(--text-muted);
+}
+
+/* --- Строки --- */
+
+.profile__group {
+  display: flex;
+  flex-direction: column;
+  padding: 8px 10px;
+}
+
+.profile__label {
+  padding: 6px 8px 4px;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--text-muted);
+}
+
+.profile__row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  height: 38px;
+  padding: 0 8px;
+  border: 0;
+  border-radius: var(--radius-sm);
+  background: none;
+  color: var(--text-secondary);
+  font: inherit;
+  font-size: 14px;
+  text-align: left;
+  cursor: pointer;
+}
+
+.profile__row:hover {
+  background: var(--bg-hover);
+  color: var(--text-primary);
+}
+
+.profile__icon {
+  flex-shrink: 0;
+  color: var(--text-muted);
+}
+
+.profile__row:hover .profile__icon {
+  color: var(--text-secondary);
+}
+
+.profile__text {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* --- Тумблер --- */
+
+.toggle {
+  position: relative;
+  flex-shrink: 0;
+  width: 38px;
+  height: 22px;
+  border-radius: var(--radius-pill);
+  background: var(--bg-active);
+  border: 1px solid var(--border-strong);
+  transition: background 0.14s ease, border-color 0.14s ease;
+}
+
+.toggle::after {
+  content: "";
+  position: absolute;
+  top: 3px;
+  left: 3px;
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+  background: var(--text-muted);
+  transition: transform 0.14s ease, background 0.14s ease;
+}
+
+.toggle--on {
+  background: var(--accent-strong);
+  border-color: var(--accent-line);
+}
+
+.toggle--on::after {
+  transform: translateX(16px);
+  background: var(--accent);
+}
+
+/* --- Низ --- */
+
+.profile__foot {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 12px 14px;
+}
+
+.profile__build {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-family: var(--font-mono);
+  font-size: 11px;
+  color: var(--text-muted);
+}
+
+/*
+  Выход — подсветкой, а не сплошной заливкой.
+
+  Сплошной красный кричит громче всего на экране, а выходят раз в жизни.
+  Кромка и подложка говорят «осторожно» ровно настолько, насколько нужно.
+*/
+.profile__out,
+.profile__in {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-shrink: 0;
+  height: 36px;
+  padding: 0 14px;
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--border-strong);
+  background: none;
+  font: inherit;
+  font-size: 13px;
+  cursor: pointer;
+}
+
+.profile__out {
+  border-color: rgba(255, 107, 120, 0.32);
+  background: rgba(255, 107, 120, 0.1);
+  color: var(--status-danger);
+}
+
+.profile__out:hover {
+  background: rgba(255, 107, 120, 0.18);
+}
+
+.profile__in {
+  color: var(--text-primary);
+}
+
+.profile__in:hover {
+  background: var(--bg-hover);
+}
+
+.profile__in:disabled {
+  opacity: 0.5;
+  cursor: default;
+}
