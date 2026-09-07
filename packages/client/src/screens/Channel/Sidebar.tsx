@@ -101,7 +101,11 @@ export function Sidebar({
             className="navrow"
             onClick={() => lastDirect && onOpenDirect(lastDirect)}
             disabled={!lastDirect}
-            title={lastDirect ? "Личные переписки" : "Переписок пока нет"}
+            title={
+              lastDirect
+                ? "Личные переписки"
+                : "Переписок пока нет — начни из контактов на главной"
+            }
             type="button"
           >
             <ChatIcon size={20} className="navrow__icon" />
