@@ -1,6 +1,6 @@
 /* Домашний экран: та же оболочка, что и в канале, но без правой панели. */
 .shell--home {
-  grid-template-columns: 248px minmax(0, 1fr);
+  grid-template-columns: 270px minmax(0, 1fr);
 }
 
 .home {
@@ -267,7 +267,12 @@
   text-decoration: none;
 }
 
-@media (max-width: 1100px) {
+/*
+  Домашний экран сжимается позже канала: здесь всего две колонки, и сайдбар в
+  них помещается почти всегда. Прячем его там же, где и везде, — на настоящей
+  мобильной ширине.
+*/
+@media (max-width: 720px) {
   .shell--home {
     grid-template-columns: minmax(0, 1fr);
   }
