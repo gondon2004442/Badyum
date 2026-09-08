@@ -33,10 +33,12 @@ interface SidebarProps {
    * Открыть переписку.
    *
    * Строка «Личные» ведёт в последнюю: раздел открывается разговором, а список
-   * людей стоит в нём второй колонкой. Нет ни одной переписки — вести некуда, и
-   * строка это показывает, а не молчит после нажатия.
+   * людей стоит в нём второй колонкой. Переписок нет ни одной — открываем
+   * раздел пустым, `null` вместо собеседника. Раньше строка в этом случае не
+   * нажималась вовсе, и первую переписку можно было завести только с главной:
+   * раздел, в который не пускают, пока в нём чего-то нет, — тупик.
    */
-  onOpenDirect?: (peer: Caller) => void;
+  onOpenDirect?: (peer: Caller | null) => void;
   onNewChannel: () => void;
   onChanged: () => void;
   /** Раскрыть меню профиля. Там же вход, настройки и выход. */
@@ -99,13 +101,8 @@ export function Sidebar({
         {onOpenDirect ? (
           <button
             className="navrow"
-            onClick={() => lastDirect && onOpenDirect(lastDirect)}
-            disabled={!lastDirect}
-            title={
-              lastDirect
-                ? "Личные переписки"
-                : "Переписок пока нет — начни из контактов на главной"
-            }
+            onClick={() => onOpenDirect(lastDirect)}
+            title="Личные переписки"
             type="button"
           >
             <ChatIcon size={20} className="navrow__icon" />

@@ -25,7 +25,8 @@ interface HomeScreenProps {
   busy: boolean;
   error: string | null;
   presence: PresenceState;
-  onOpenDirect: (peer: Caller) => void;
+  /** Открыть личные. `null` — раздел без выбранного собеседника. */
+  onOpenDirect: (peer: Caller | null) => void;
   onChangeUsername: () => void;
 }
 

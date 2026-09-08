@@ -1,4 +1,4 @@
-import { GoogleIcon } from "../../components/Icons.tsx";
+import { GoogleButton } from "../../components/GoogleButton.tsx";
 import { Pitch } from "../../components/Pitch.tsx";
 import { startLogin, useAccount } from "../../account.ts";
 import "./Login.css";
@@ -54,15 +54,11 @@ export function LoginScreen({ onSkip }: LoginScreenProps) {
           </p>
 
           <div className="login__act">
-            <button
-              className="gbtn"
+            <GoogleButton
               onClick={() => void startLogin()}
               disabled={account.loggingIn}
-              type="button"
-            >
-              <GoogleIcon size={18} className="gbtn__logo" />
-              {account.loggingIn ? "Жду Google…" : "Войти через Google"}
-            </button>
+              label={account.loggingIn ? "Жду Google…" : "Войти через Google"}
+            />
           </div>
 
           {/*

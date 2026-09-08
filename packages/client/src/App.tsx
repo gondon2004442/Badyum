@@ -73,6 +73,14 @@ export function App() {
   const [guest, setGuest] = useState(skippedLogin);
   /** Открыт ли экран смены юза. Первый выбор открывается сам, см. ниже. */
   const [changingUsername, setChangingUsername] = useState(false);
+  /**
+   * Открыт ли раздел личных без выбранного собеседника.
+   *
+   * Отдельным признаком, а не сессией: сессии тут нет — канала переписки ещё не
+   * существует, потому что не выбрано, с кем переписываться. Раньше этого
+   * состояния не было вовсе, и раздел не открывался, пока в нём пусто.
+   */
+  const [directsOpen, setDirectsOpen] = useState(false);
   const presence = usePresence(account);
 
   /*
@@ -215,7 +223,15 @@ export function App() {
    * кнопкой, и уходит в тот же самый канал.
    */
   const openDirectWith = useCallback(
-    (peer: Caller) => {
+    (peer: Caller | null) => {
+      // Некого открывать — открываем сам раздел. Выбрать собеседника человек
+      // сможет там же, в колонке людей: контакты стоят в ней рядом с прошлыми
+      // переписками.
+      if (!peer) {
+        setDirectsOpen(true);
+        return;
+      }
+      setDirectsOpen(false);
       void go(async () => {
         const displayName = nameFor(account);
         const direct = await openDirect(peer.userId);
@@ -266,6 +282,7 @@ export function App() {
 
   const leaveSession = () => {
     setSession(null);
+    setDirectsOpen(false);
     // Цель из адреса тоже сбрасываем: иначе выход из канала возвращал бы
     // на экран входа в него же вместо домашнего.
     setTarget(null);
@@ -286,7 +303,7 @@ export function App() {
           key={session.channelId}
           token={session.token}
           channelId={session.channelId}
-          peer={session.peer}
+          peer={session.peer ?? null}
           online={presence.online.has(session.peer.userId)}
           onlineIds={presence.online}
           selfName={nameFor(account)}
@@ -334,6 +351,34 @@ export function App() {
         <JoinScreen
           target={target}
           onJoined={(result) => enter({ ...result, code: target.code ?? null, voice: true })}
+        />
+      </>
+    );
+  }
+
+  /**
+   * Личные, открытые пустыми: раздел есть, разговора ещё нет.
+   *
+   * Стоит после сессии и цели из адреса нарочно: и то и другое — прямое
+   * намерение попасть в конкретный канал, и подменять его разделом нельзя.
+   */
+  if (directsOpen) {
+    return (
+      <>
+        {overlay}
+        <DirectScreen
+          peer={null}
+          token={null}
+          channelId={null}
+          online={false}
+          onlineIds={presence.online}
+          selfName={nameFor(account)}
+          onCall={() => {}}
+          onLeave={leaveSession}
+          onOpenDirect={openDirectWith}
+          onOpenChannel={openChannel}
+          onNewChannel={newChannel}
+          busy={presence.call !== null}
         />
       </>
     );
