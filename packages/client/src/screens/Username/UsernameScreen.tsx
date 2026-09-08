@@ -2,6 +2,7 @@ import { useEffect, useRef, useState, type FormEvent } from "react";
 import { publicOrigin } from "../../api.ts";
 import { nameOf, type Account } from "../../account.ts";
 import { Avatar } from "../../components/Avatar.tsx";
+import { Pitch } from "../../components/Pitch.tsx";
 import "./Username.css";
 
 interface UsernameScreenProps {
@@ -111,26 +112,12 @@ export function UsernameScreen({ account, onDone, onCancel }: UsernameScreenProp
       {/*
         Левая половина — обещание, ради которого человек сюда шёл.
 
-        Выбор юза сам по себе выглядит формальностью, и на пустом экране с одним
-        полем человек не понимает, зачем он это делает. Рядом стоит то, что он
-        получит, — и шаг перестаёт быть препятствием.
+        Та же панель, что на входе: выбор юза идёт следом за ним, и меняться
+        между двумя шагами ей незачем. Сам по себе этот шаг выглядит
+        формальностью, и на пустом экране с одним полем человек не понимает,
+        зачем он это делает; рядом стоит то, что он получит.
       */}
-      <aside className="pickname__promise">
-        <div className="pickname__brand">
-          <span className="pickname__mark">B</span>
-          <span className="pickname__word">BADYUM</span>
-        </div>
-        <div className="pickname__pitch">
-          <h2 className="pickname__slogan">
-            Зашёл — <br />
-            уже говоришь
-          </h2>
-          <p className="pickname__lede">
-            Канал живёт всегда: ни дозвона, ни «принять или отклонить». Ссылка
-            вместо звонка, имя вместо регистрации.
-          </p>
-        </div>
-      </aside>
+      <Pitch />
 
       <form className="pickname__card" onSubmit={submit}>
         <span className="pickname__kicker">

@@ -1,0 +1,175 @@
+/*
+  Экран входа.
+
+  Те же две половины, что и на выборе юза: чёрная сцена слева, форма справа.
+  Ширина сцены 440 из макета, форма занимает остальное и держит колонку в 380 —
+  строка длиннее читается хуже, а растягивать её на половину монитора незачем.
+*/
+.login {
+  display: grid;
+  grid-template-columns: 440px minmax(0, 1fr);
+  min-height: 100dvh;
+  background: var(--bg-base);
+}
+
+.login__form {
+  display: flex;
+  min-width: 0;
+  padding: 40px 44px;
+  padding-bottom: calc(40px + var(--safe-bottom));
+  padding-top: calc(40px + var(--safe-top));
+  background: var(--bg-base);
+}
+
+/* Форма по центру половины: на входе больше ничего нет, и прижимать её к
+   верхнему краю не к чему. */
+.login__pane {
+  width: 100%;
+  max-width: 380px;
+  margin: auto;
+}
+
+.login__mark {
+  display: none;
+  place-items: center;
+  width: 44px;
+  height: 44px;
+  margin-bottom: 22px;
+  border-radius: var(--radius-md);
+  background: var(--bg-active);
+  border: 1px solid var(--border-strong);
+  font-size: 18px;
+  font-weight: 800;
+}
+
+.login__kicker {
+  display: block;
+  font-family: var(--font-mono);
+  font-size: 10.5px;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--text-muted);
+}
+
+.login__title {
+  margin: 8px 0 0;
+  font-size: 26px;
+  font-weight: 800;
+  letter-spacing: -0.02em;
+}
+
+.login__lead {
+  max-width: 42ch;
+  margin: 10px 0 0;
+  font-size: 14px;
+  line-height: 1.6;
+  color: var(--text-secondary);
+}
+
+.login__act {
+  margin-top: 28px;
+}
+
+/*
+  Кнопка Google — по канону Google Identity, тёмный вариант.
+
+  Фон #131314, рамка #8E918F, текст #E3E3E3 в Roboto Medium 14 с разрядкой
+  0.25px, логотип 18 px и без перекраски. Цвета здесь не наши и меняться не
+  могут: узнаваемость этой кнопки и есть весь её смысл — человек ищет глазами
+  знакомое, а не красивое.
+
+  Roboto берём только тот, что уже есть в системе. Свои шрифты лежат рядом с
+  приложением нарочно — интерфейс должен подниматься без сети, — и тянуть ради
+  одной кнопки ещё одно семейство из чужого домена мы не будем. Там, где
+  Roboto нет, подставится наш Manrope: начертание отличается, всё остальное в
+  каноне остаётся на месте.
+*/
+.gbtn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  width: 100%;
+  height: 44px;
+  padding: 0 12px;
+  border: 1px solid #8e918f;
+  border-radius: 22px;
+  background: #131314;
+  color: #e3e3e3;
+  font-family: Roboto, var(--font);
+  font-size: 14px;
+  font-weight: 500;
+  letter-spacing: 0.25px;
+  transition: background 0.12s ease;
+}
+
+.gbtn:hover:not(:disabled) {
+  background: #1c1c1d;
+}
+
+.gbtn:disabled {
+  opacity: 0.6;
+  cursor: default;
+}
+
+.gbtn__logo {
+  flex-shrink: 0;
+}
+
+.login__problem {
+  margin: 14px 0 0;
+  font-size: 13px;
+  line-height: 1.5;
+  color: var(--status-danger);
+}
+
+.login__foot {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 14px;
+  margin-top: 26px;
+}
+
+.login__note {
+  margin: 0;
+  font-size: 12.5px;
+  line-height: 1.6;
+  color: var(--text-muted);
+}
+
+.login__note b {
+  font-weight: 600;
+  color: var(--text-secondary);
+}
+
+/* Подчёркнутая строка, а не кнопка: рядом с гугловской кнопкой любая вторая
+   читалась бы как равная ей, хотя это выход для меньшинства. */
+.login__skip {
+  padding: 0;
+  font-size: 12.5px;
+  color: var(--text-secondary);
+  text-align: left;
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+
+.login__skip:hover {
+  color: var(--text-primary);
+}
+
+@media (max-width: 860px) {
+  .login {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .login__mark {
+    display: grid;
+  }
+
+  .login__form {
+    padding: 30px 24px 26px;
+    padding-bottom: calc(26px + var(--safe-bottom));
+    padding-top: calc(30px + var(--safe-top));
+  }
+}

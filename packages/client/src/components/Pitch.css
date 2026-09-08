@@ -1,0 +1,72 @@
+/*
+  Панель обещания на входных экранах.
+
+  Тот же слой, что колонка навигации в приложении: чистый чёрный слева,
+  содержимое светлее справа. Человек ещё не вошёл, а расположение слоёв уже
+  то же самое, что он увидит внутри.
+*/
+.pitch {
+  display: flex;
+  flex-direction: column;
+  padding: 40px 38px;
+  padding-bottom: calc(40px + var(--safe-bottom));
+  background: var(--bg-nav);
+  border-right: 1px solid var(--border-subtle);
+}
+
+.pitch__brand {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.pitch__mark {
+  display: grid;
+  place-items: center;
+  width: 44px;
+  height: 44px;
+  border-radius: var(--radius-md);
+  background: var(--bg-active);
+  border: 1px solid var(--border-strong);
+  font-size: 18px;
+  font-weight: 800;
+}
+
+.pitch__word {
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.18em;
+}
+
+/* Фраза по центру половины, а не прижата к низу: она смотрит на форму. */
+.pitch__body {
+  margin: auto 0;
+}
+
+.pitch__slogan {
+  margin: 0 0 18px;
+  font-size: 32px;
+  line-height: 1.14;
+  font-weight: 800;
+  letter-spacing: -0.03em;
+}
+
+.pitch__lede {
+  max-width: 30ch;
+  margin: 0;
+  font-size: 14px;
+  line-height: 1.62;
+  color: var(--text-secondary);
+}
+
+/*
+  На узком экране обещание уходит целиком.
+
+  Это самый частый вход — ссылку прислали в чат и открыли с телефона, — и
+  тянуть половину экрана рекламой там нечем: место нужно самой форме.
+*/
+@media (max-width: 860px) {
+  .pitch {
+    display: none;
+  }
+}
