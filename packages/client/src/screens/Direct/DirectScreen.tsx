@@ -1,21 +1,30 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useMemo, useState } from "react";
 import type { Caller } from "@badyum/shared";
 import { Avatar } from "../../components/Avatar.tsx";
-import { PhoneIcon, SearchIcon, WaveIcon } from "../../components/Icons.tsx";
-import { ChatPanel } from "../Channel/ChatPanel.tsx";
+import { ChatIcon, SearchIcon } from "../../components/Icons.tsx";
+import { GoogleButton } from "../../components/GoogleButton.tsx";
 import { Sidebar } from "../Channel/Sidebar.tsx";
 import { ProfileMenu } from "../Channel/ProfileMenu.tsx";
-import { useVoice } from "../../voice/useVoice.ts";
-import { handleOf, nameOf, useAccount } from "../../account.ts";
+import { Talk } from "./Talk.tsx";
+import { useContacts } from "../../contacts.ts";
+import { nameOf, startLogin, useAccount } from "../../account.ts";
 import { myIdentityId, recentChannels, type RecentChannel } from "../../storage.ts";
 import "../Channel/Channel.css";
 import "./Direct.css";
 
 interface DirectScreenProps {
-  token: string;
-  /** Канал переписки: он же часть ключа, по которому лежат вложения. */
-  channelId: string;
-  peer: Caller;
+  /**
+   * С кем разговор. `null` — раздел открыт, но переписки ещё нет ни одной.
+   *
+   * Это не ошибка и не загрузка, а обычное состояние нового человека. Раньше
+   * его не существовало: строка «Личные» просто не нажималась, пока переписок
+   * нет, а завести первую можно было только с главной. Раздел, в который
+   * нельзя войти, пока в нём чего-то нет, — это тупик, а не раздел.
+   */
+  peer: Caller | null;
+  /** Токен и канал переписки. `null` вместе с `peer`. */
+  token: string | null;
+  channelId: string | null;
   /** В сети ли собеседник: без этого звонить некому. */
   online: boolean;
   /** Кто из знакомых сейчас в сети — для точек в списке. */
@@ -24,7 +33,7 @@ interface DirectScreenProps {
   onCall: () => void;
   onLeave: () => void;
   /** Открыть переписку с другим человеком, не выходя из раздела. */
-  onOpenDirect: (peer: Caller) => void;
+  onOpenDirect: (peer: Caller | null) => void;
   onOpenChannel: (channel: RecentChannel) => void;
   onNewChannel: () => void;
   /** Идёт другой звонок — второй начинать не даём. */
@@ -39,18 +48,14 @@ interface DirectScreenProps {
  * неё приходилось «возвращаться» — то есть личные не были разделом, они были
  * тупиком.
  *
- * Сама переписка — тот же канал, что и для звонка, просто вход в него без
- * микрофона. Поэтому у переписки и разговора одна история: позвонили,
- * поговорили, вышли, а написанное осталось на месте.
- *
- * Разрешение на микрофон здесь не спрашивается намеренно: человек, который
- * зашёл написать сообщение, не должен видеть системный запрос. Микрофон
- * появляется ровно тогда, когда он нажал «Позвонить».
+ * В колонке людей стоят не только те, с кем уже говорили, но и контакты. Иначе
+ * первую переписку было не начать изнутри раздела: список показывал бы ровно
+ * тех, кто в него уже попал, и попасть в него было неоткуда.
  */
 export function DirectScreen({
+  peer,
   token,
   channelId,
-  peer,
   online,
   onlineIds,
   selfName,
@@ -61,49 +66,46 @@ export function DirectScreen({
   onNewChannel,
   busy,
 }: DirectScreenProps) {
-  const voice = useVoice();
   const account = useAccount();
+  const contacts = useContacts(account.account);
   const [profileOpen, setProfileOpen] = useState(false);
   const [query, setQuery] = useState("");
   const identity = myIdentityId();
 
-  /** Переписки этого браузера. Сервер о них не знает — список местный. */
-  const chats = useMemo(
-    () => recentChannels().filter((c) => c.peer),
-    [channelId],
-  );
+  /**
+   * Кому можно написать: сначала те, с кем уже переписывались, следом
+   * остальные контакты.
+   *
+   * Порядок именно такой: переписка — это то, к чему возвращаются, а контакт
+   * без переписки — то, с чего её начинают. Прошлые разговоры знает только этот
+   * браузер (сервер о них не помнит), контакты приходят с сервера, и человек
+   * из обоих списков не должен появиться дважды.
+   */
+  const people = useMemo(() => {
+    const chats = recentChannels()
+      .filter((c) => c.peer)
+      .map((c) => c.peer!);
+    const seen = new Set(chats.map((who) => who.userId));
+
+    const rest = contacts.friends
+      .filter((c) => !seen.has(c.user.id))
+      .map(
+        (c): Caller => ({
+          userId: c.user.id,
+          username: c.user.username,
+          displayName: c.user.displayName,
+          avatarUrl: c.user.avatarUrl,
+        }),
+      );
+
+    return [...chats, ...rest];
+  }, [channelId, contacts.friends]);
 
   const found = useMemo(() => {
     const needle = query.trim().toLowerCase();
-    if (!needle) return chats;
-    return chats.filter((c) => nameOf(c.peer!).toLowerCase().includes(needle));
-  }, [chats, query]);
-
-  /**
-   * Кто как выглядит. В личной переписке участников ровно двое, и обоих мы
-   * знаем и без канала: собеседник пришёл из контактов, свой аватар — из
-   * аккаунта.
-   */
-  const avatars = useMemo(
-    () =>
-      new Map<string, string | null>([
-        ...voice.participants.map((p) => [p.userId, p.avatarUrl] as const),
-        ...(voice.self.selfId
-          ? ([[voice.self.selfId, account.account?.avatarUrl ?? null]] as const)
-          : []),
-      ]),
-    [voice.participants, voice.self.selfId, account.account?.avatarUrl],
-  );
-  const joined = useRef(false);
-
-  useEffect(() => {
-    if (joined.current) return;
-    joined.current = true;
-    void voice.join(token, undefined, false).catch(() => {
-      // Переписка без сети — не повод показывать ошибку микрофона: его тут нет.
-      // Состояние соединения и так видно по тому, уходят ли сообщения.
-    });
-  }, [token, voice]);
+    if (!needle) return people;
+    return people.filter((who) => nameOf(who).toLowerCase().includes(needle));
+  }, [people, query]);
 
   return (
     <div className="directs">
@@ -150,12 +152,11 @@ export function DirectScreen({
         </div>
 
         <div className="people__list">
-          {found.map((chat) => {
-            const who = chat.peer!;
-            const current = who.userId === peer.userId;
+          {found.map((who) => {
+            const current = who.userId === peer?.userId;
             return (
               <button
-                key={chat.channelId}
+                key={who.userId}
                 className={`prow${current ? " prow--on" : ""}`}
                 onClick={() => (current ? undefined : onOpenDirect(who))}
                 type="button"
@@ -178,74 +179,78 @@ export function DirectScreen({
 
           {found.length === 0 ? (
             <p className="people__empty">
-              {query.trim() ? "Никого не нашлось" : "Здесь появятся те, с кем ты переписывался"}
+              {query.trim()
+                ? "Никого не нашлось"
+                : account.account
+                  ? "Пока некому писать. Добавь человека по юзу — это на главной, в контактах"
+                  : "Личные переписки появляются у тех, кто вошёл"}
             </p>
           ) : null}
         </div>
       </aside>
 
-      <section className="talk">
-        <header className="talk__head">
-          <span className="talk__face">
-            <Avatar userId={peer.userId} name={nameOf(peer)} src={peer.avatarUrl} />
-            {online ? <i className="prow__dot" /> : null}
-          </span>
-
-          <span className="talk__who">
-            <span className="talk__name">{nameOf(peer)}</span>
-            <span className="talk__where">
-              {online ? (
-                <>
-                  <WaveIcon size={14} />
-                  сейчас в сети
-                </>
-              ) : (
-                "не в сети"
-              )}
-            </span>
-          </span>
-
-          <button
-            className="talk__call"
-            onClick={onCall}
-            disabled={!online || busy}
-            title={online ? `Позвонить ${nameOf(peer)}` : "Не в сети"}
-            type="button"
-          >
-            <PhoneIcon size={17} />
-            Позвонить
-          </button>
-        </header>
-
-        <ChatPanel
-          look="direct"
-          intro={
-            <div className="intro">
-              <Avatar
-                userId={peer.userId}
-                name={nameOf(peer)}
-                src={peer.avatarUrl}
-                className="intro__face"
-              />
-              <span className="intro__name">{nameOf(peer)}</span>
-              {handleOf(peer) ? <span className="intro__tag">{handleOf(peer)}</span> : null}
-              <p className="intro__note">
-                Переписка остаётся между звонками — сюда можно кинуть ссылку и уйти.
-              </p>
-            </div>
-          }
-          messages={voice.messages}
-          selfId={voice.self.selfId}
-          onSend={voice.sendChat}
-          typing={voice.typing}
-          onTyping={voice.setTyping}
-          onUpload={voice.uploadFile}
+      {peer && token && channelId ? (
+        <Talk
+          // Пересоздаём разговор при смене собеседника: движок держит
+          // соединение и переписку внутри и между каналами не переиспользуется.
+          key={channelId}
+          token={token}
           channelId={channelId}
-          avatars={avatars}
-          placeholder={`Написать ${nameOf(peer)}`}
-          empty={`Это переписка с ${nameOf(peer)}. Она никуда не денется между звонками.`}
+          peer={peer}
+          online={online}
+          onCall={onCall}
+          busy={busy}
         />
-      </section>
+      ) : (
+        /*
+          Пустая правая колонка.
+
+          Говорит ровно то, чего не хватает, и даёт это сделать. Раньше на этом
+          месте не было ничего — вместе со строкой «Личные», которая не
+          нажималась.
+        */
+        <section className="talk talk--empty">
+          <div className="nobody">
+            <span className="nobody__icon">
+              <ChatIcon size={26} />
+            </span>
+            {account.account ? (
+              <>
+                <h2 className="nobody__title">
+                  {people.length > 0 ? "Выбери, кому написать" : "Писать пока некому"}
+                </h2>
+                <p className="nobody__note">
+                  {people.length > 0
+                    ? "Слева — те, с кем ты уже говорил, и твои контакты. Переписка остаётся между звонками."
+                    : "Контакты добавляются по юзу — на главной. Как только человек примет заявку, он появится здесь."}
+                </p>
+                {people.length === 0 ? (
+                  <button className="nobody__go" onClick={onLeave} type="button">
+                    На главную
+                  </button>
+                ) : null}
+              </>
+            ) : (
+              <>
+                <h2 className="nobody__title">Личные — для тех, кто вошёл</h2>
+                <p className="nobody__note">
+                  Написать можно тому, кто у тебя в контактах, а контакты живут в
+                  аккаунте. В каналы это не мешает заходить и дальше — там вход не
+                  нужен.
+                </p>
+                {account.available ? (
+                  <GoogleButton
+                    className="nobody__in"
+                    onClick={() => void startLogin()}
+                    disabled={account.loggingIn}
+                    label={account.loggingIn ? "Жду Google…" : "Войти через Google"}
+                  />
+                ) : null}
+              </>
+            )}
+          </div>
+        </section>
+      )}
 
       {/* Выход из раздела остаётся: на телефоне колонок рядом нет. */}
       <button className="directs__back" onClick={onLeave} type="button">

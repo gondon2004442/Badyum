@@ -230,6 +230,73 @@
   cursor: default;
 }
 
+/*
+  Пустая правая колонка: раздел открыт, разговор ещё не выбран.
+
+  Не заглушка «здесь ничего нет», а место, где недостающее заводится: текст
+  говорит, чего не хватает, и рядом стоит то, чем это исправить.
+*/
+.talk--empty {
+  grid-template-rows: minmax(0, 1fr);
+  place-items: center;
+  padding: 24px;
+}
+
+.nobody {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  max-width: 380px;
+  text-align: center;
+}
+
+.nobody__icon {
+  display: grid;
+  place-items: center;
+  width: 56px;
+  height: 56px;
+  margin-bottom: 18px;
+  border-radius: var(--radius-lg);
+  background: var(--accent-wash);
+  border: 1px solid var(--accent-line);
+  color: var(--accent);
+}
+
+.nobody__title {
+  margin: 0;
+  font-size: 19px;
+  font-weight: 700;
+  color: var(--text-primary);
+}
+
+.nobody__note {
+  margin: 10px 0 0;
+  font-size: 13.5px;
+  line-height: 1.6;
+  color: var(--text-secondary);
+}
+
+.nobody__go {
+  margin-top: 20px;
+  padding: 13px 22px;
+  border-radius: var(--radius-md);
+  background: var(--bg-surface);
+  border: 1px solid var(--border-subtle);
+  color: var(--text-primary);
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.nobody__go:hover {
+  background: var(--bg-hover);
+}
+
+.nobody__in {
+  width: auto;
+  min-width: 260px;
+  margin-top: 20px;
+}
+
 /* --- Карточка знакомства --- */
 
 .intro {

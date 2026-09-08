@@ -53,7 +53,8 @@ interface ChannelScreenProps {
   onLeave: () => void;
   onOpenChannel: (channel: RecentChannel) => void;
   /** Уйти в личные переписки, не выходя из канала. */
-  onOpenDirect: (peer: Caller) => void;
+  /** Открыть личные. `null` — раздел без выбранного собеседника. */
+  onOpenDirect: (peer: Caller | null) => void;
   onNewChannel: () => void;
 }
 
