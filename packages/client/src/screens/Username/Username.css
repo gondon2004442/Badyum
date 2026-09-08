@@ -12,58 +12,6 @@
   background: var(--bg-base);
 }
 
-/* --- Обещание слева --- */
-
-.pickname__promise {
-  display: flex;
-  flex-direction: column;
-  justify-content: space-between;
-  padding: 40px 38px;
-  padding-bottom: calc(40px + var(--safe-bottom));
-  background: var(--bg-nav);
-  border-right: 1px solid var(--border-subtle);
-}
-
-.pickname__brand {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-}
-
-.pickname__mark {
-  display: grid;
-  place-items: center;
-  width: 44px;
-  height: 44px;
-  border-radius: var(--radius-md);
-  background: var(--bg-active);
-  border: 1px solid var(--border-strong);
-  font-size: 18px;
-  font-weight: 800;
-}
-
-.pickname__word {
-  font-size: 12px;
-  font-weight: 700;
-  letter-spacing: 0.18em;
-}
-
-.pickname__slogan {
-  margin: 0 0 18px;
-  font-size: 34px;
-  line-height: 1.16;
-  font-weight: 800;
-  letter-spacing: -0.01em;
-}
-
-.pickname__lede {
-  max-width: 280px;
-  margin: 0;
-  font-size: 13.5px;
-  line-height: 1.65;
-  color: var(--text-secondary);
-}
-
 /* --- Форма справа --- */
 
 .pickname__card {
@@ -139,13 +87,9 @@
 }
 
 @media (max-width: 860px) {
-  /* Обещание уходит: на телефоне место нужно самой форме. */
+  /* Обещание уходит вместе с колонкой — прячет его сама панель. */
   .pickname {
     grid-template-columns: minmax(0, 1fr);
-  }
-
-  .pickname__promise {
-    display: none;
   }
 }
 

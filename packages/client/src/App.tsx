@@ -5,11 +5,19 @@ import { DirectScreen } from "./screens/Direct/DirectScreen.tsx";
 import { openDirect } from "./contacts.ts";
 import { CallOverlay } from "./screens/Call/CallOverlay.tsx";
 import { UsernameScreen } from "./screens/Username/UsernameScreen.tsx";
+import { LoginScreen } from "./screens/Login/LoginScreen.tsx";
 import { usePresence } from "./presence.ts";
 import { ChannelScreen } from "./screens/Channel/ChannelScreen.tsx";
 import { HomeScreen } from "./screens/Home/HomeScreen.tsx";
 import { ApiError, createChannel, fetchInviteCode, requestJoin } from "./api.ts";
-import { rememberChannel, savedHotkeys, type RecentChannel } from "./storage.ts";
+import {
+  isNewcomer,
+  rememberChannel,
+  rememberSkippedLogin,
+  savedHotkeys,
+  skippedLogin,
+  type RecentChannel,
+} from "./storage.ts";
 import { nameFor, useAccount } from "./account.ts";
 import { isDesktop, setHotkeys } from "./desktop.ts";
 import { report } from "./report.ts";
@@ -53,7 +61,16 @@ export function App() {
   const [session, setSession] = useState<Session | null>(null);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const { account, setUsername } = useAccount();
+  const { account, available, loading, setUsername } = useAccount();
+  /*
+    Первый ли это визит и не отказался ли человек от входа.
+
+    Оба снимка берутся один раз при запуске. Следы появятся в ту же секунду,
+    как он куда-нибудь зайдёт, и пересчитывай мы их на каждом рендере —
+    выход из канала возвращал бы уже не на тот экран, с которого всё началось.
+  */
+  const [fresh] = useState(isNewcomer);
+  const [guest, setGuest] = useState(skippedLogin);
   /** Открыт ли экран смены юза. Первый выбор открывается сам, см. ниже. */
   const [changingUsername, setChangingUsername] = useState(false);
   const presence = usePresence(account);
@@ -317,6 +334,32 @@ export function App() {
         <JoinScreen
           target={target}
           onJoined={(result) => enter({ ...result, code: target.code ?? null, voice: true })}
+        />
+      </>
+    );
+  }
+
+  /**
+   * Новому человеку — экран входа вместо домашнего.
+   *
+   * Только новому и только на пустом месте: пришедший по ссылке сюда не
+   * попадает вовсе — его цель разобрана выше, — а вернувшийся гость уже
+   * ответил на этот вопрос делом.
+   *
+   * Пока идёт `loading`, экран показываем тоже. Ответ приходит за доли
+   * секунды, и мигнуть за это время домашним экраном хуже, чем показать
+   * входной на мгновение дольше: в первом случае человек видит, как страница
+   * подменяется у него под курсором.
+   */
+  if (!account && !guest && fresh && (loading || available)) {
+    return (
+      <>
+        {overlay}
+        <LoginScreen
+          onSkip={() => {
+            rememberSkippedLogin();
+            setGuest(true);
+          }}
         />
       </>
     );

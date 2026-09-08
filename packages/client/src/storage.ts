@@ -11,6 +11,7 @@ const KEY_CHANNELS = "badyum:channels";
 const KEY_PEOPLE = "badyum:people";
 const KEY_DENOISE = "badyum:denoise";
 const KEY_HOTKEYS = "badyum:hotkeys";
+const KEY_GUEST = "badyum:guest";
 
 const RECENT_CHANNELS_LIMIT = 12;
 const RECENT_PEOPLE_LIMIT = 40;
@@ -196,4 +197,33 @@ export function savedHotkeys(): SavedHotkeys | null {
 
 export function rememberHotkeys(next: SavedHotkeys): void {
   write(KEY_HOTKEYS, next);
+}
+
+// ---------------------------------------------------------------------------
+// Первый визит
+// ---------------------------------------------------------------------------
+
+/**
+ * Никогда ли ещё этим приложением с этого устройства не пользовались.
+ *
+ * По следам, а не по отдельной отметке: имя, каналы и знакомые появляются от
+ * любого осмысленного действия, а отметка «был» врала бы после чистки истории.
+ * Идентификатор устройства для этого не годится — он выдаётся при первом же
+ * обращении, то есть существует у всех, включая только что зашедшего.
+ *
+ * Нужно ровно для одного: показать экран входа тому, кто пришёл на пустое
+ * место. Человеку, который вчера сидел в канале гостем, предлагать войти
+ * заново незачем — он уже показал, чего хочет.
+ */
+export function isNewcomer(): boolean {
+  return myName() === "" && recentChannels().length === 0 && knownPeople().length === 0;
+}
+
+/** Отказался ли человек от входа. Спрашивать второй раз мы не будем. */
+export function skippedLogin(): boolean {
+  return read<boolean>(KEY_GUEST, false);
+}
+
+export function rememberSkippedLogin(): void {
+  write(KEY_GUEST, true);
 }
